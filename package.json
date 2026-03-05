@@ -1,9 +1,12 @@
 {
   "name": "@suqiai/cloudphone",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "description": "OpenClaw CloudPhone 插件 —— 提供自定义 Agent 工具能力",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "openclaw.plugin.json"
