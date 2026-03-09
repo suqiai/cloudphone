@@ -10,6 +10,11 @@
  * 官方文档：https://docs.openclaw.ai/plugins/agent-tools
  */
 
+import { writeFile, mkdir } from "fs/promises";
+import { tmpdir } from "os";
+import { join, extname } from "path";
+import { createHash } from "crypto";
+
 /** 插件配置类型（与 openclaw.plugin.json configSchema 保持一致） */
 export interface CloudphonePluginConfig {
   baseUrl?: string;
@@ -17,11 +22,10 @@ export interface CloudphonePluginConfig {
   timeout?: number;
 }
 
-/** MCP Content 项 */
-export interface McpContentItem {
-  type: "text";
-  text: string;
-}
+/** MCP Content 项（text | image，遵循 MCP 规范 + OpenClaw 约定） */
+export type McpContentItem =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
 
 /** MCP 风格的工具返回值 */
 export interface McpToolResult {
@@ -103,7 +107,7 @@ async function apiRequest(
       return toJsonText({
         ok: false,
         code: body.code,
-        message: body.message ?? "未知错误",
+        message: body.data ?? "未知错误",
       });
     }
 
@@ -411,6 +415,97 @@ const snapshotTool: ToolDefinition = {
   execute: async (_id, params) => apiRequest("POST", "/devices/snapshot", params),
 };
 
+const MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".svg": "image/svg+xml",
+};
+
+function guessMimeType(url: string, contentType?: string | null): string {
+  if (contentType) {
+    const base = contentType.split(";")[0].trim().toLowerCase();
+    if (base.startsWith("image/")) return base;
+  }
+  const pathname = new URL(url).pathname.toLowerCase();
+  const dot = pathname.lastIndexOf(".");
+  if (dot !== -1) {
+    const ext = pathname.slice(dot);
+    if (ext in MIME_BY_EXT) return MIME_BY_EXT[ext];
+  }
+  return "image/png";
+}
+
+const renderImageTool: ToolDefinition = {
+  name: "cloudphone_render_image",
+  description:
+    "将 HTTPS 图片 URL 渲染为可在 chat 中直接展示的图片。" +
+    "适用于 cloudphone_snapshot 返回截图 URL 后需要在对话中展示的场景。",
+  parameters: {
+    type: "object",
+    properties: {
+      image_url: {
+        type: "string",
+        description: "HTTPS 图片地址",
+      },
+    },
+    required: ["image_url"],
+  },
+  execute: async (_id, params) => {
+    const imageUrl = String(params.image_url ?? "");
+    if (!imageUrl) {
+      return toJsonText({ ok: false, message: "缺少 image_url 参数" });
+    }
+
+    try {
+      const resp = await fetch(imageUrl);
+      if (!resp.ok) {
+        return toJsonText({
+          ok: false,
+          message: `图片请求失败：${resp.status} ${resp.statusText}`,
+        });
+      }
+
+      const mimeType = guessMimeType(imageUrl, resp.headers.get("content-type"));
+      if (!mimeType.startsWith("image/")) {
+        return toJsonText({
+          ok: false,
+          message: `URL 返回的内容不是图片（${mimeType}）`,
+        });
+      }
+
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const hash = createHash("md5").update(buf).digest("hex");
+      const ext = extname(new URL(imageUrl).pathname) || ".jpg";
+      const dir = join(tmpdir(), "cloudphone-images");
+      await mkdir(dir, { recursive: true });
+      const filePath = join(dir, `${hash}${ext}`);
+      await writeFile(filePath, buf);
+
+      return {
+        content: [
+          { type: "text" as const, text: `MEDIA:${filePath}` },
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              ok: true,
+              filePath,
+              url: imageUrl,
+              size: buf.length,
+            }),
+          },
+        ],
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return toJsonText({ ok: false, message: `图片获取失败：${message}` });
+    }
+  },
+};
+
 /** 导出所有工具定义列表 */
 export const tools: ToolDefinition[] = [
   getUserProfileTool,
@@ -426,4 +521,5 @@ export const tools: ToolDefinition[] = [
   keyeventTool,
   waitTool,
   snapshotTool,
+  renderImageTool,
 ];

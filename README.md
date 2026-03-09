@@ -1,95 +1,20 @@
-## CloudPhone Plugin
+# CloudPhone Plugin for OpenClaw
 
-OpenClaw CloudPhone 插件，用于为 Agent 提供基于云手机 OpenAPI 的工具能力（用户信息、设备管理、设备 UI 交互）。
+OpenClaw 云手机插件 —— 让 AI Agent 具备云手机的设备管理与 UI 自动化操控能力。
 
----
+通过对话即可完成云手机的查询、开关机、截图、点击、滑动、输入等操作，无需手动编写脚本。
 
-### 目录结构
+## 快速开始
 
-```
-cloudphone/
-├── openclaw.plugin.json   # 插件清单（id、configSchema、uiHints）
-├── package.json           # npm 依赖 & 构建脚本
-├── tsconfig.json          # TypeScript 编译配置
-├── src/
-│   ├── index.ts           # 插件入口，注册所有工具
-│   └── tools.ts           # Agent 工具定义与实现
-└── README.md
-```
-
----
-
-### 开发与构建
-
-- **安装依赖**
+### 1. 安装插件
 
 ```bash
-npm install
+openclaw plugins install @suqiai/cloudphone
 ```
 
-- **开发模式（监听编译）**
+### 2. 配置插件
 
-```bash
-npm run dev
-```
-
-- **生产构建**
-
-```bash
-npm run build
-```
-
-构建产物默认为 `dist/index.js`，并通过 `package.json` 中的 `openclaw.extensions` 暴露给 OpenClaw。
-
----
-
-### 在 OpenClaw 中加载插件
-
-- **方式一：链接模式（开发推荐）**
-
-```bash
-openclaw plugins install -l ./
-```
-
-- **方式二：扩展目录**
-
-将整个目录复制（或软链接）到工作区：
-
-```text
-<workspace>/.openclaw/extensions/cloudphone/
-```
-
-或全局目录：
-
-```text
-~/.openclaw/extensions/cloudphone/
-```
-
-- **方式三：配置路径**
-
-在 OpenClaw 配置中添加（指向构建后的入口文件）：
-
-```json
-{
-  "plugins": {
-    "load": {
-      "paths": ["E:/cloudphone/dist/index.js"]
-    }
-  }
-}
-```
-
----
-
-### 插件配置（`openclaw.plugin.json`）
-
-插件配置位于 OpenClaw 配置的 `plugins.entries.cloudphone.config` 下，对应的 `configSchema` 为：
-
-- `baseUrl`：CloudPhone API 基础地址（不包含 `/openapi/v1`），默认 `https://cptest.yaltc.cn`
-- `apikey`：Authorization 鉴权凭证（ApiKey）
-- `timeout`：请求超时时间（毫秒），默认 `5000`
-
-示例配置：
+在 OpenClaw 配置文件 `openclaw.json` 中添加以下内容：
 
 ```json
 {
@@ -98,9 +23,8 @@ openclaw plugins install -l ./
       "cloudphone": {
         "enabled": true,
         "config": {
-          "baseUrl": "https://cptest.yaltc.cn",
-          "apikey": "your-api-key",
-          "timeout": 5000
+          "baseUrl": "https://your-cloudphone-api.com",
+          "apikey": "your-api-key"
         }
       }
     }
@@ -108,77 +32,192 @@ openclaw plugins install -l ./
 }
 ```
 
-| 字段       | 类型   | 必填 | 说明                                   |
-|------------|--------|------|----------------------------------------|
-| `baseUrl`  | string | 否   | CloudPhone API 基础地址，未配置时使用默认值   |
-| `apikey`   | string | 否   | Authorization 头的值（ApiKey）          |
-| `timeout`  | number | 否   | 请求超时（ms），默认 `5000`           |
-
-> 修改配置后通常需要重启 Gateway 才能生效。
-
----
-
-### 已注册工具
-
-所有工具都在 `src/tools.ts` 中定义，并在 `src/index.ts` 中通过 `api.registerTool` 注册。
-
-| 工具名                            | 说明                                             |
-|-----------------------------------|--------------------------------------------------|
-| `cloudphone_get_user_profile` | 获取当前用户信息 |
-| `cloudphone_list_devices` | 获取用户云手机列表 |
-| `cloudphone_get_device_info` | 获取云手机设备详情 |
-| `cloudphone_device_power` | 云手机电源控制（start/stop/restart） |
-| `cloudphone_get_adb_connection` | 获取云手机 ADB/SSH 连接信息 |
-| `cloudphone_tap` | 点击交互 |
-| `cloudphone_long_press` | 长按交互 |
-| `cloudphone_swipe` | 滑动交互 |
-| `cloudphone_input_text` | 文本输入 |
-| `cloudphone_clear_text` | 文本清空 |
-| `cloudphone_keyevent` | 系统按键控制 |
-| `cloudphone_wait` | 条件等待 |
-| `cloudphone_snapshot` | 状态观测（快照） |
-
-工具内部会根据配置自动拼接并调用 `/{baseUrl}/openapi/v1/*` 接口：
-
-- 使用 `baseUrl`（默认 `https://cptest.yaltc.cn`）
-- 在配置了 `apikey` 时附带 `Authorization` 头
-- 根据 `timeout` 做超时控制，并返回明确的错误信息
-
----
-
-### 扩展：添加新工具
-
-1. 在 `src/tools.ts` 中新增一个符合 `ToolDefinition` 接口的对象：
-
-```typescript
-const myTool: ToolDefinition = {
-  name: "my_tool",          // 建议使用 snake_case
-  description: "工具功能描述",
-  parameters: {
-    type: "object",
-    properties: {
-      input: { type: "string", description: "输入参数" }
-    },
-    required: ["input"]
-  },
-  execute: async (_id, { input }) => {
-    // 使用 config.baseUrl / config.apikey / config.timeout 实现业务逻辑
-    return { content: [{ type: "text", text: JSON.stringify({ result: input }) }] };
-  }
-};
-```
-
-2. 将新工具加入导出的 `tools` 数组：
-
-```typescript
-export const tools: ToolDefinition[] = [myTool];
-```
-
-3. 运行构建并重启 Gateway：
+### 3. 重启 Gateway
 
 ```bash
-npm run build
+openclaw gateway restart
 ```
 
-> 重启后，OpenClaw 会自动根据插件导出的工具列表更新 Agent 可用工具。
+插件加载成功后，Agent 即可使用全部云手机工具。
 
+## 配置说明
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `baseUrl` | string | 否 | `https://cptest.yaltc.cn` | 云手机 API 基础地址（不含 `/openapi/v1`） |
+| `apikey` | string | 是 | — | Authorization 鉴权凭证（ApiKey） |
+| `timeout` | number | 否 | `5000` | 请求超时时间（毫秒） |
+
+> `apikey` 可在云手机管理后台获取。
+
+## 工具一览
+
+插件安装后，Agent 将自动获得以下工具能力：
+
+### 用户与设备管理
+
+| 工具 | 说明 |
+|------|------|
+| `cloudphone_get_user_profile` | 获取当前用户基本信息 |
+| `cloudphone_list_devices` | 获取云手机设备列表（支持分页、关键字搜索、状态筛选） |
+| `cloudphone_get_device_info` | 获取指定设备的详细信息 |
+| `cloudphone_device_power` | 设备电源控制：开机 / 关机 / 重启 |
+| `cloudphone_get_adb_connection` | 获取设备的 ADB/SSH 连接信息 |
+
+### UI 交互操控
+
+| 工具 | 说明 |
+|------|------|
+| `cloudphone_tap` | 点击屏幕指定坐标 |
+| `cloudphone_long_press` | 长按屏幕指定坐标（可设置时长） |
+| `cloudphone_swipe` | 从起点滑动到终点（可设置时长） |
+| `cloudphone_input_text` | 在当前输入框输入文本 |
+| `cloudphone_clear_text` | 清空当前输入框 |
+| `cloudphone_keyevent` | 发送系统按键：返回 / 主页 / 回车 / 最近任务 / 电源 |
+
+### 状态观测
+
+| 工具 | 说明 |
+|------|------|
+| `cloudphone_wait` | 等待指定条件（元素出现/消失、页面稳定） |
+| `cloudphone_snapshot` | 获取设备截图或 UI 树快照 |
+| `cloudphone_render_image` | 将截图 URL 渲染为对话中可直接展示的图片 |
+
+## 使用示例
+
+安装配置完成后，直接通过自然语言对话即可操控云手机：
+
+### 查看设备列表
+
+> 帮我看看我有哪些云手机
+
+Agent 会调用 `cloudphone_list_devices` 返回设备列表。
+
+### 开机 & 查看状态
+
+> 把我的云手机开机，然后截个图看看当前画面
+
+Agent 会依次调用 `cloudphone_device_power`（开机）→ `cloudphone_snapshot`（截图）→ `cloudphone_render_image`（展示截图）。
+
+### 自动化操作
+
+> 在云手机上打开微信，搜索"OpenClaw"公众号并关注
+
+Agent 会自动规划操作步骤，通过截图观察屏幕、点击图标、输入文字、滑动页面等一系列工具组合完成任务。
+
+### 设备调试
+
+> 给我这台云手机的 ADB 连接信息
+
+Agent 会调用 `cloudphone_get_adb_connection` 返回连接地址和端口。
+
+## 工具参数详解
+
+### cloudphone_list_devices
+
+```
+keyword   : string  — 搜索关键字（设备名称/设备 ID）
+status    : string  — 状态筛选："online" | "offline"
+page      : integer — 页码，默认 1
+size      : integer — 每页条数，默认 20
+```
+
+### cloudphone_device_power
+
+```
+user_device_id : number — 用户设备 ID（必填）
+device_id      : string — 设备 ID（必填）
+action         : string — 操作类型："start" | "stop" | "restart"（必填）
+```
+
+### cloudphone_tap
+
+```
+device_id : string  — 设备 ID（必填）
+x         : integer — X 坐标，像素（必填）
+y         : integer — Y 坐标，像素（必填）
+```
+
+### cloudphone_long_press
+
+```
+device_id : string  — 设备 ID（必填）
+x         : integer — X 坐标，像素（必填）
+y         : integer — Y 坐标，像素（必填）
+duration  : integer — 长按时长（毫秒），默认 1000
+```
+
+### cloudphone_swipe
+
+```
+device_id : string  — 设备 ID（必填）
+start_x   : integer — 起点 X 坐标（必填）
+start_y   : integer — 起点 Y 坐标（必填）
+end_x     : integer — 终点 X 坐标（必填）
+end_y     : integer — 终点 Y 坐标（必填）
+duration  : integer — 滑动时长（毫秒），默认 300
+```
+
+### cloudphone_input_text
+
+```
+device_id : string — 设备 ID（必填）
+text      : string — 输入文本内容（必填）
+```
+
+### cloudphone_keyevent
+
+```
+device_id : string — 设备 ID（必填）
+key_code  : string — 按键码："BACK" | "HOME" | "ENTER" | "RECENT" | "POWER"（必填）
+```
+
+### cloudphone_wait
+
+```
+device_id : string  — 设备 ID（必填）
+condition : string  — 等待条件："element_appear" | "element_disappear" | "page_stable"（必填）
+timeout   : integer — 超时时间（毫秒），默认 5000
+selector  : string  — 元素选择器（条件为元素出现/消失时使用）
+```
+
+### cloudphone_snapshot
+
+```
+device_id : string — 设备 ID（必填）
+format    : string — 快照格式："screenshot" | "ui_tree" | "both"，默认 screenshot
+```
+
+### cloudphone_render_image
+
+```
+image_url : string — HTTPS 图片地址（必填）
+```
+
+## 常见问题
+
+**Q: 安装后 Agent 找不到云手机工具？**
+
+确认 `openclaw.json` 中 `plugins.entries.cloudphone.enabled` 设置为 `true`，并已重启 Gateway。
+
+**Q: 调用工具报 "请求失败" 或超时？**
+
+- 检查 `baseUrl` 是否正确（不要包含 `/openapi/v1` 后缀）
+- 检查 `apikey` 是否有效
+- 网络不稳定时可适当增大 `timeout` 值
+
+**Q: 如何获取 apikey？**
+
+请在云手机管理后台的「API 密钥」页面创建或查看。
+
+**Q: 截图工具返回了 URL 但对话中看不到图片？**
+
+Agent 会自动调用 `cloudphone_render_image` 将 URL 转为可展示的图片。如果未自动展示，可以手动让 Agent "展示这张截图"。
+
+## 更新日志
+
+当前版本：**v0.0.6**
+
+## 许可证
+
+本插件遵循项目所在仓库的许可协议。
