@@ -55,6 +55,14 @@ const plugin = {
 
   register(api: PluginApi) {
     const config = resolveConfig(api);
+    // 入参日志：仅打印配置项存在性及非敏感字段，不输出 apikey 等敏感信息
+    api.logger.info(
+      `[cloudphone] register 入参: config=${JSON.stringify({
+        baseUrl: config.baseUrl ?? "(未配置)",
+        timeout: config.timeout,
+        hasApikey: !!config.apikey,
+      })}`
+    );
     setConfig(config);
     api.logger.info(`[cloudphone] 插件加载完成，版本=${version}，baseUrl=${config.baseUrl ?? "(未配置，使用默认值)"}`);
 
