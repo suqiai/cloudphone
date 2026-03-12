@@ -1,168 +1,168 @@
 # CloudPhone Tool Reference
 
-本文件是 `openclaw-cloudphone` skill 的参数速查表，只描述当前插件已经提供的 14 个工具。
+This file is the parameter quick reference for the `openclaw-cloudphone` skill. It only describes the 14 tools currently provided by the plugin.
 
-参数与说明以 `src/tools.ts` 中的定义为准。
+The source of truth for parameters and descriptions is `src/tools.ts`.
 
-## 设备管理
+## Device Management
 
 ### `cloudphone_get_user_profile`
 
-- 作用：获取当前用户的基本信息
-- 参数：无
-- 返回：用户信息 JSON 文本
+- Purpose: get the current user's basic information
+- Parameters: none
+- Returns: user information as JSON text
 
 ### `cloudphone_list_devices`
 
-- 作用：获取当前用户的云手机设备列表，支持分页和筛选
-- 参数：
-- `keyword`: `string`，可选，关键字，匹配设备名称或设备 ID
-- `status`: `string`，可选，可选值：`online`、`offline`
-- `page`: `integer`，可选，页码，说明中默认 `1`
-- `size`: `integer`，可选，每页条数，说明中默认 `20`
-- 返回：设备列表 JSON 文本
-- 典型用途：先找设备，再决定后续操作
+- Purpose: list the current user's cloud phone devices with pagination and filters
+- Parameters:
+- `keyword`: `string`, optional, keyword matching device name or device ID
+- `status`: `string`, optional, allowed values: `online`, `offline`
+- `page`: `integer`, optional, page number, default `1`
+- `size`: `integer`, optional, items per page, default `20`
+- Returns: device list as JSON text
+- Typical use: locate the target device before deciding the next action
 
 ### `cloudphone_get_device_info`
 
-- 作用：获取指定云手机设备详情
-- 必填参数：
-- `user_device_id`: `number`，用户设备 ID
-- 返回：设备详情 JSON 文本
-- 典型用途：查看目标设备的详细状态、补全上下文
+- Purpose: get details for a specific cloud phone device
+- Required parameters:
+- `user_device_id`: `number`, user device ID
+- Returns: device details as JSON text
+- Typical use: inspect the target device state and gather more context
 
 ### `cloudphone_device_power`
 
-- 作用：对云手机执行开机、关机或重启
-- 必填参数：
-- `user_device_id`: `number`，用户设备 ID
-- `device_id`: `string`，设备 ID
-- `action`: `string`，可选值：`start`、`stop`、`restart`
-- 返回：电源控制结果 JSON 文本
-- 典型用途：设备离线时开机、异常时重启、任务结束后关机
-- 注意：这个工具同时需要 `user_device_id` 和 `device_id`
+- Purpose: start, stop, or restart a cloud phone device
+- Required parameters:
+- `user_device_id`: `number`, user device ID
+- `device_id`: `string`, device ID
+- `action`: `string`, allowed values: `start`, `stop`, `restart`
+- Returns: power action result as JSON text
+- Typical use: start an offline device, restart a stuck device, or power off after a task
+- Note: this tool requires both `user_device_id` and `device_id`
 
 ### `cloudphone_get_adb_connection`
 
-- 作用：获取指定云手机的 ADB/SSH 连接信息
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- 返回：ADB/SSH 连接信息 JSON 文本
-- 典型用途：设备调试、外部连接
+- Purpose: get ADB/SSH connection information for a specific cloud phone device
+- Required parameters:
+- `device_id`: `string`, device ID
+- Returns: ADB/SSH connection info as JSON text
+- Typical use: device debugging and external connections
 
-## UI 交互
+## UI Interaction
 
 ### `cloudphone_tap`
 
-- 作用：点击指定坐标位置
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- `x`: `integer`，X 坐标，像素
-- `y`: `integer`，Y 坐标，像素
-- 返回：点击结果 JSON 文本
-- 典型用途：点击按钮、图标、输入框、列表项
+- Purpose: tap a specific screen coordinate
+- Required parameters:
+- `device_id`: `string`, device ID
+- `x`: `integer`, X coordinate in pixels
+- `y`: `integer`, Y coordinate in pixels
+- Returns: tap result as JSON text
+- Typical use: tap buttons, icons, input fields, or list items
 
 ### `cloudphone_long_press`
 
-- 作用：长按指定坐标，可选持续时长
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- `x`: `integer`，X 坐标，像素
-- `y`: `integer`，Y 坐标，像素
-- 可选参数：
-- `duration`: `integer`，长按时长，毫秒，说明中默认 `1000`
-- 返回：长按结果 JSON 文本
-- 典型用途：呼出上下文菜单、长按图标、拖拽前预按
+- Purpose: long press a specific coordinate with an optional duration
+- Required parameters:
+- `device_id`: `string`, device ID
+- `x`: `integer`, X coordinate in pixels
+- `y`: `integer`, Y coordinate in pixels
+- Optional parameters:
+- `duration`: `integer`, press duration in milliseconds, default `1000`
+- Returns: long press result as JSON text
+- Typical use: open context menus, long press icons, or prepare for drag actions
 
 ### `cloudphone_swipe`
 
-- 作用：按起止坐标执行滑动操作
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- `start_x`: `integer`，起点 X 坐标
-- `start_y`: `integer`，起点 Y 坐标
-- `end_x`: `integer`，终点 X 坐标
-- `end_y`: `integer`，终点 Y 坐标
-- 可选参数：
-- `duration`: `integer`，滑动时长，毫秒，说明中默认 `300`
-- 返回：滑动结果 JSON 文本
-- 典型用途：列表滚动、翻页、拖动区域
+- Purpose: swipe from a start coordinate to an end coordinate
+- Required parameters:
+- `device_id`: `string`, device ID
+- `start_x`: `integer`, start X coordinate
+- `start_y`: `integer`, start Y coordinate
+- `end_x`: `integer`, end X coordinate
+- `end_y`: `integer`, end Y coordinate
+- Optional parameters:
+- `duration`: `integer`, swipe duration in milliseconds, default `300`
+- Returns: swipe result as JSON text
+- Typical use: scroll lists, change pages, or drag a view
 
 ### `cloudphone_input_text`
 
-- 作用：在当前输入焦点处输入文本
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- `text`: `string`，输入文本内容
-- 返回：输入结果 JSON 文本
-- 典型用途：搜索、登录、表单填写
+- Purpose: type text into the current input focus
+- Required parameters:
+- `device_id`: `string`, device ID
+- `text`: `string`, text to input
+- Returns: input result as JSON text
+- Typical use: search, sign in, or fill forms
 
 ### `cloudphone_clear_text`
 
-- 作用：清空当前输入框文本
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- 返回：清空结果 JSON 文本
-- 典型用途：输入前先清空旧内容
+- Purpose: clear the current input field
+- Required parameters:
+- `device_id`: `string`, device ID
+- Returns: clear result as JSON text
+- Typical use: remove old text before entering new content
 
 ### `cloudphone_keyevent`
 
-- 作用：触发系统按键事件
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- `key_code`: `string`，可选值：`BACK`、`HOME`、`ENTER`、`RECENT`、`POWER`
-- 返回：按键结果 JSON 文本
-- 典型用途：返回、回桌面、提交输入、打开最近任务
+- Purpose: send a system key event
+- Required parameters:
+- `device_id`: `string`, device ID
+- `key_code`: `string`, allowed values: `BACK`, `HOME`, `ENTER`, `RECENT`, `POWER`
+- Returns: key event result as JSON text
+- Typical use: go back, return home, submit input, or open recent apps
 
-## 状态观察
+## State Observation
 
 ### `cloudphone_wait`
 
-- 作用：等待页面条件满足，确保操作时序稳定
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- `condition`: `string`，可选值：`element_appear`、`element_disappear`、`page_stable`
-- 可选参数：
-- `timeout`: `integer`，超时时间，毫秒，说明中默认 `5000`
-- `selector`: `string`，当条件为元素出现或消失时可用
-- 返回：等待结果 JSON 文本
-- 典型用途：页面跳转后等待稳定、等待元素出现或消失
-- 注意：若没有明确元素选择器，优先使用 `page_stable`
+- Purpose: wait for a page condition to improve action timing
+- Required parameters:
+- `device_id`: `string`, device ID
+- `condition`: `string`, allowed values: `element_appear`, `element_disappear`, `page_stable`
+- Optional parameters:
+- `timeout`: `integer`, timeout in milliseconds, default `5000`
+- `selector`: `string`, available when the condition is element appear or disappear
+- Returns: wait result as JSON text
+- Typical use: wait for page stability after a navigation, or wait for an element to appear or disappear
+- Note: if no clear selector is available, prefer `page_stable`
 
 ### `cloudphone_snapshot`
 
-- 作用：获取设备截图或 UI 树快照
-- 必填参数：
-- `device_id`: `string`，设备 ID
-- 可选参数：
-- `format`: `string`，可选值：`screenshot`、`ui_tree`、`both`，说明中默认 `screenshot`
-- 返回：快照结果 JSON 文本，通常包含截图 URL、UI 树或两者
-- 典型用途：任何 UI 操作前后的观察与验证
+- Purpose: capture a device screenshot or UI tree snapshot
+- Required parameters:
+- `device_id`: `string`, device ID
+- Optional parameters:
+- `format`: `string`, allowed values: `screenshot`, `ui_tree`, `both`, default `screenshot`
+- Returns: snapshot result as JSON text, usually including a screenshot URL, a UI tree, or both
+- Typical use: observe and verify the UI before and after any interaction
 
 ### `cloudphone_render_image`
 
-- 作用：把 HTTPS 图片 URL 渲染为聊天中可直接展示的图片
-- 必填参数：
-- `image_url`: `string`，HTTPS 图片地址
-- 返回：
-- 一条 `MEDIA:<filePath>` 文本内容，用于让宿主展示图片
-- 一条 JSON 文本，包含 `ok`、`filePath`、`url`、`size`
-- 典型用途：把 `cloudphone_snapshot` 返回的截图 URL 转成可视化结果
-- 注意：如果 URL 不可访问、返回内容不是图片，工具会返回失败信息
+- Purpose: render an HTTPS image URL as an image directly displayable in chat
+- Required parameters:
+- `image_url`: `string`, HTTPS image URL
+- Returns:
+- one `MEDIA:<filePath>` text item for the host to display the image
+- one JSON text item containing `ok`, `filePath`, `url`, and `size`
+- Typical use: turn a screenshot URL returned by `cloudphone_snapshot` into a visible image
+- Note: if the URL is unreachable or does not return an image, the tool returns a failure message
 
-## 使用顺序建议
+## Recommended Calling Order
 
-### 看设备
+### Inspect Devices
 
 1. `cloudphone_list_devices`
-2. 必要时 `cloudphone_get_device_info`
+2. if needed, `cloudphone_get_device_info`
 
-### 控电源
+### Control Power
 
-1. 先确定 `user_device_id` 和 `device_id`
-2. 再调用 `cloudphone_device_power`
+1. confirm both `user_device_id` and `device_id`
+2. then call `cloudphone_device_power`
 
-### 做 UI 自动化
+### Run UI Automation
 
 1. `cloudphone_snapshot`
 2. `cloudphone_render_image`
@@ -171,17 +171,17 @@
 5. `cloudphone_snapshot`
 6. `cloudphone_render_image`
 
-### 出现异常
+### Recover From Problems
 
 1. `cloudphone_keyevent(BACK)`
 2. `cloudphone_keyevent(HOME)`
 3. `cloudphone_snapshot`
-4. 必要时 `cloudphone_device_power(action="restart")`
+4. if needed, `cloudphone_device_power(action="restart")`
 
-## 易错点
+## Common Pitfalls
 
-- `device_id` 和 `user_device_id` 不是同一个字段
-- 坐标单位是像素，不是比例
-- `duration` 单位是毫秒
-- `cloudphone_render_image` 需要的是图片 URL，不是设备 ID
-- 连续多步 UI 操作前后都应该重新截图，避免坐标基于旧页面失效
+- `device_id` and `user_device_id` are not the same field
+- coordinate values are pixels, not percentages
+- `duration` is measured in milliseconds
+- `cloudphone_render_image` expects an image URL, not a device ID
+- re-capture the screen before and after multi-step UI actions so coordinates do not rely on an outdated page state
