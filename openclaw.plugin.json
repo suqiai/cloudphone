@@ -2,39 +2,39 @@
   "id": "cloudphone",
   "name": "CloudPhone Plugin",
   "version": "0.0.10",
-  "description": "OpenClaw CloudPhone 插件 —— 提供云手机 OpenAPI（用户、设备管理、UI交互）Agent 工具能力",
+  "description": "OpenClaw CloudPhone plugin that exposes CloudPhone OpenAPI capabilities for user info, device management, and UI automation as agent tools.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "baseUrl": {
         "type": "string",
-        "description": "CloudPhone API 基础地址（不包含 /openapi/v1）",
+        "description": "CloudPhone API base URL (without /openapi/v1)",
         "default": "https://cptest.yaltc.cn"
       },
       "apikey": {
         "type": "string",
-        "description": "Authorization 鉴权凭证（ApiKey）"
+        "description": "Authorization credential (ApiKey)"
       },
       "timeout": {
         "type": "number",
-        "description": "请求超时时间（毫秒）",
+        "description": "Request timeout in milliseconds",
         "default": 5000
       }
     }
   },
   "uiHints": {
     "baseUrl": {
-      "label": "API 基础地址",
-      "placeholder": "https://cptest.yaltc.cn（不含 /openapi/v1）"
+      "label": "API Base URL",
+      "placeholder": "https://cptest.yaltc.cn (without /openapi/v1)"
     },
     "apikey": {
       "label": "Authorization / ApiKey",
-      "placeholder": "输入 Authorization 值（如 AiApiKey）",
+      "placeholder": "Enter the Authorization value (for example, AiApiKey)",
       "sensitive": true
     },
     "timeout": {
-      "label": "请求超时（ms）"
+      "label": "Request Timeout (ms)"
     }
   },
   "skills": [

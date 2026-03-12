@@ -1,13 +1,13 @@
 /**
- * Agent 工具定义模块
+ * Agent tool definitions.
  *
- * 每个工具需包含：
- *   - name:        snake_case 格式的工具名
- *   - description: 向 AI Agent 说明工具用途
- *   - parameters:  JSON Schema 描述入参结构
- *   - execute:     执行函数，接收 (id, params)，返回 MCP Content 格式结果
+ * Each tool must include:
+ *   - name:        snake_case tool name
+ *   - description: human-readable description for the AI agent
+ *   - parameters:  JSON Schema for the input payload
+ *   - execute:     execution handler that returns MCP content items
  *
- * 官方文档：https://docs.openclaw.ai/plugins/agent-tools
+ * Docs: https://docs.openclaw.ai/plugins/agent-tools
  */
 
 import { writeFile, mkdir } from "fs/promises";
@@ -15,24 +15,24 @@ import { tmpdir } from "os";
 import { join, extname } from "path";
 import { createHash } from "crypto";
 
-/** 插件配置类型（与 openclaw.plugin.json configSchema 保持一致） */
+/** Plugin config type, aligned with openclaw.plugin.json configSchema. */
 export interface CloudphonePluginConfig {
   baseUrl?: string;
   apikey?: string;
   timeout?: number;
 }
 
-/** MCP Content 项（text | image，遵循 MCP 规范 + OpenClaw 约定） */
+/** MCP content items (text | image), following MCP + OpenClaw conventions. */
 export type McpContentItem =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string };
 
-/** MCP 风格的工具返回值 */
+/** MCP-style tool return value. */
 export interface McpToolResult {
   content: McpContentItem[];
 }
 
-/** 工具定义类型（与 OpenClaw api.registerTool 参数对齐） */
+/** Tool definition shape, aligned with OpenClaw api.registerTool. */
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -46,7 +46,7 @@ export interface ToolDefinition {
 
 let runtimeConfig: CloudphonePluginConfig = {};
 
-/** 在插件注册阶段注入配置 */
+/** Inject runtime config during plugin registration. */
 export function setConfig(config: CloudphonePluginConfig): void {
   runtimeConfig = config;
 }
@@ -94,7 +94,7 @@ async function apiRequest(
       return toJsonText({
         ok: false,
         httpStatus: response.status,
-        message: `HTTP 错误：${response.status} ${response.statusText}`,
+        message: `HTTP error: ${response.status} ${response.statusText}`,
       });
     }
 
@@ -107,7 +107,7 @@ async function apiRequest(
       return toJsonText({
         ok: false,
         code: body.code,
-        message: body.data ?? "未知错误",
+        message: body.data ?? "Unknown error",
       });
     }
 
@@ -116,7 +116,7 @@ async function apiRequest(
     const message = err instanceof Error ? err.message : String(err);
     return toJsonText({
       ok: false,
-      message: `请求失败：${message}`,
+      message: `Request failed: ${message}`,
     });
   } finally {
     if (timer) {
@@ -127,7 +127,7 @@ async function apiRequest(
 
 const getUserProfileTool: ToolDefinition = {
   name: "cloudphone_get_user_profile",
-  description: "获取当前用户的基本信息。",
+  description: "Get the current user's basic profile information.",
   parameters: {
     type: "object",
     properties: {},
@@ -137,26 +137,26 @@ const getUserProfileTool: ToolDefinition = {
 
 const listDevicesTool: ToolDefinition = {
   name: "cloudphone_list_devices",
-  description: "获取当前用户的云手机设备列表，支持分页和筛选。",
+  description: "List the current user's cloud phone devices with pagination and filters.",
   parameters: {
     type: "object",
     properties: {
       keyword: {
         type: "string",
-        description: "关键字（设备名称/设备 ID）",
+        description: "Keyword to match device name or device ID",
       },
       status: {
         type: "string",
         enum: ["online", "offline"],
-        description: "设备状态过滤",
+        description: "Device status filter",
       },
       page: {
         type: "integer",
-        description: "页码，默认 1",
+        description: "Page number, default is 1",
       },
       size: {
         type: "integer",
-        description: "每页条数，默认 20",
+        description: "Page size, default is 20",
       },
     },
   },
@@ -165,13 +165,13 @@ const listDevicesTool: ToolDefinition = {
 
 const getDeviceInfoTool: ToolDefinition = {
   name: "cloudphone_get_device_info",
-  description: "获取指定云手机设备详情。",
+  description: "Get details for a specific cloud phone device.",
   parameters: {
     type: "object",
     properties: {
       user_device_id: {
         type: "number",
-        description: "用户设备 ID",
+        description: "User device ID",
       },
     },
     required: ["user_device_id"],
@@ -181,22 +181,22 @@ const getDeviceInfoTool: ToolDefinition = {
 
 const devicePowerTool: ToolDefinition = {
   name: "cloudphone_device_power",
-  description: "对云手机执行开机、关机或重启。",
+  description: "Start, stop, or restart a cloud phone device.",
   parameters: {
     type: "object",
     properties: {
       user_device_id: {
         type: "number",
-        description: "用户设备 ID",
+        description: "User device ID",
       },
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       action: {
         type: "string",
         enum: ["start", "stop", "restart"],
-        description: "电源操作类型",
+        description: "Power action",
       },
     },
     required: ["user_device_id", "device_id", "action"],
@@ -206,13 +206,13 @@ const devicePowerTool: ToolDefinition = {
 
 const getAdbConnectionTool: ToolDefinition = {
   name: "cloudphone_get_adb_connection",
-  description: "获取指定云手机的 ADB/SSH 连接信息。",
+  description: "Get ADB/SSH connection info for a specific cloud phone device.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
     },
     required: ["device_id"],
@@ -222,21 +222,21 @@ const getAdbConnectionTool: ToolDefinition = {
 
 const tapTool: ToolDefinition = {
   name: "cloudphone_tap",
-  description: "点击指定坐标位置。",
+  description: "Tap a specific screen coordinate.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       x: {
         type: "integer",
-        description: "X 坐标（像素）",
+        description: "X coordinate in pixels",
       },
       y: {
         type: "integer",
-        description: "Y 坐标（像素）",
+        description: "Y coordinate in pixels",
       },
     },
     required: ["device_id", "x", "y"],
@@ -246,25 +246,25 @@ const tapTool: ToolDefinition = {
 
 const longPressTool: ToolDefinition = {
   name: "cloudphone_long_press",
-  description: "长按指定坐标，可选持续时长。",
+  description: "Long press a specific coordinate with an optional duration.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       x: {
         type: "integer",
-        description: "X 坐标（像素）",
+        description: "X coordinate in pixels",
       },
       y: {
         type: "integer",
-        description: "Y 坐标（像素）",
+        description: "Y coordinate in pixels",
       },
       duration: {
         type: "integer",
-        description: "长按时长（毫秒），默认 1000",
+        description: "Press duration in milliseconds, default is 1000",
       },
     },
     required: ["device_id", "x", "y"],
@@ -274,33 +274,33 @@ const longPressTool: ToolDefinition = {
 
 const swipeTool: ToolDefinition = {
   name: "cloudphone_swipe",
-  description: "按起止坐标执行滑动操作。",
+  description: "Swipe from a start coordinate to an end coordinate.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       start_x: {
         type: "integer",
-        description: "起点 X 坐标",
+        description: "Start X coordinate",
       },
       start_y: {
         type: "integer",
-        description: "起点 Y 坐标",
+        description: "Start Y coordinate",
       },
       end_x: {
         type: "integer",
-        description: "终点 X 坐标",
+        description: "End X coordinate",
       },
       end_y: {
         type: "integer",
-        description: "终点 Y 坐标",
+        description: "End Y coordinate",
       },
       duration: {
         type: "integer",
-        description: "滑动时长（毫秒），默认 300",
+        description: "Swipe duration in milliseconds, default is 300",
       },
     },
     required: ["device_id", "start_x", "start_y", "end_x", "end_y"],
@@ -310,17 +310,17 @@ const swipeTool: ToolDefinition = {
 
 const inputTextTool: ToolDefinition = {
   name: "cloudphone_input_text",
-  description: "在当前输入焦点处输入文本。",
+  description: "Type text into the current input focus.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       text: {
         type: "string",
-        description: "输入文本内容",
+        description: "Text to input",
       },
     },
     required: ["device_id", "text"],
@@ -330,13 +330,13 @@ const inputTextTool: ToolDefinition = {
 
 const clearTextTool: ToolDefinition = {
   name: "cloudphone_clear_text",
-  description: "清空当前输入框文本。",
+  description: "Clear text from the current input field.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
     },
     required: ["device_id"],
@@ -346,18 +346,18 @@ const clearTextTool: ToolDefinition = {
 
 const keyeventTool: ToolDefinition = {
   name: "cloudphone_keyevent",
-  description: "触发系统按键事件。",
+  description: "Send a system key event.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       key_code: {
         type: "string",
         enum: ["BACK", "HOME", "ENTER", "RECENT", "POWER"],
-        description: "系统按键码",
+        description: "System key code",
       },
     },
     required: ["device_id", "key_code"],
@@ -367,26 +367,26 @@ const keyeventTool: ToolDefinition = {
 
 const waitTool: ToolDefinition = {
   name: "cloudphone_wait",
-  description: "等待页面条件满足，确保操作时序稳定。",
+  description: "Wait for a page condition to make automation timing more reliable.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       condition: {
         type: "string",
         enum: ["element_appear", "element_disappear", "page_stable"],
-        description: "等待条件",
+        description: "Wait condition",
       },
       timeout: {
         type: "integer",
-        description: "超时时间（毫秒），默认 5000",
+        description: "Timeout in milliseconds, default is 5000",
       },
       selector: {
         type: "string",
-        description: "元素选择器（条件为元素出现/消失时可用）",
+        description: "Element selector used with appear/disappear conditions",
       },
     },
     required: ["device_id", "condition"],
@@ -396,18 +396,18 @@ const waitTool: ToolDefinition = {
 
 const snapshotTool: ToolDefinition = {
   name: "cloudphone_snapshot",
-  description: "获取设备截图或 UI 树快照。",
+  description: "Capture a device screenshot or UI tree snapshot.",
   parameters: {
     type: "object",
     properties: {
       device_id: {
         type: "string",
-        description: "设备 ID",
+        description: "Device ID",
       },
       format: {
         type: "string",
         enum: ["screenshot", "ui_tree", "both"],
-        description: "快照格式，默认 screenshot",
+        description: "Snapshot format, default is screenshot",
       },
     },
     required: ["device_id"],
@@ -442,14 +442,14 @@ function guessMimeType(url: string, contentType?: string | null): string {
 const renderImageTool: ToolDefinition = {
   name: "cloudphone_render_image",
   description:
-    "将 HTTPS 图片 URL 渲染为可在 chat 中直接展示的图片。" +
-    "适用于 cloudphone_snapshot 返回截图 URL 后需要在对话中展示的场景。",
+    "Render an HTTPS image URL as an image that can be displayed directly in chat. " +
+    "Use this after cloudphone_snapshot returns a screenshot URL.",
   parameters: {
     type: "object",
     properties: {
       image_url: {
         type: "string",
-        description: "HTTPS 图片地址",
+        description: "HTTPS image URL",
       },
     },
     required: ["image_url"],
@@ -457,7 +457,7 @@ const renderImageTool: ToolDefinition = {
   execute: async (_id, params) => {
     const imageUrl = String(params.image_url ?? "");
     if (!imageUrl) {
-      return toJsonText({ ok: false, message: "缺少 image_url 参数" });
+      return toJsonText({ ok: false, message: "Missing required parameter: image_url" });
     }
 
     try {
@@ -465,7 +465,7 @@ const renderImageTool: ToolDefinition = {
       if (!resp.ok) {
         return toJsonText({
           ok: false,
-          message: `图片请求失败：${resp.status} ${resp.statusText}`,
+          message: `Image request failed: ${resp.status} ${resp.statusText}`,
         });
       }
 
@@ -473,7 +473,7 @@ const renderImageTool: ToolDefinition = {
       if (!mimeType.startsWith("image/")) {
         return toJsonText({
           ok: false,
-          message: `URL 返回的内容不是图片（${mimeType}）`,
+          message: `The URL did not return an image (${mimeType})`,
         });
       }
 
@@ -501,12 +501,12 @@ const renderImageTool: ToolDefinition = {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return toJsonText({ ok: false, message: `图片获取失败：${message}` });
+      return toJsonText({ ok: false, message: `Failed to fetch image: ${message}` });
     }
   },
 };
 
-/** 导出所有工具定义列表 */
+/** Export all tool definitions. */
 export const tools: ToolDefinition[] = [
   getUserProfileTool,
   listDevicesTool,
