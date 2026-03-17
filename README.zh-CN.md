@@ -13,13 +13,13 @@ OpenClaw 云手机插件，让 AI Agent 具备云手机的设备管理与 UI 自
 ### 1. 安装插件
 
 ```bash
-openclaw plugins install @suqiai/cloudphone
+openclaw plugins install @whateverai/cloudphone
 ```
 
 后续如需更新插件，可执行：
 
 ```bash
-openclaw plugins update @suqiai/cloudphone
+openclaw plugins update @whateverai/cloudphone
 ```
 
 ### 2. 配置插件
