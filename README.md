@@ -13,13 +13,13 @@ Starting from `v1.0.1`, the package also ships with a built-in skill, `basic-ski
 ### 1. Install the plugin
 
 ```bash
-openclaw plugins install @suqiai/cloudphone
+openclaw plugins install @whateverai/cloudphone
 ```
 
 To update the plugin later, run:
 
 ```bash
-openclaw plugins update @suqiai/cloudphone
+openclaw plugins update @whateverai/cloudphone
 ```
 
 ### 2. Configure the plugin
