@@ -33,7 +33,7 @@ openclaw plugins update @whateverai/cloudphone
       "cloudphone": {
         "enabled": true,
         "config": {
-          "baseUrl": "https://ai.suqi.tech/ai",
+          "baseUrl": "https://whateverai.ai/ai",
           "apikey": "your-api-key"
         }
       }
