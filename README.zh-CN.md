@@ -41,7 +41,7 @@ openclaw plugins update @whateverai/cloudphone
         "enabled": true,
         "config": {
           "baseUrl": "https://whateverai.ai/ai",
-          "apikey": "your-api-key"
+          "apikey": "你可以在该网站的用户中心获取 API 密钥"
         }
       }
     }

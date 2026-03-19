@@ -41,7 +41,7 @@ Add the following configuration to `openclaw.json`:
         "enabled": true,
         "config": {
           "baseUrl": "https://whateverai.ai/ai",
-          "apikey": "your-api-key"
+          "apikey": "the apikey you can get from the user center of this website"
         }
       }
     }
