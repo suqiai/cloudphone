@@ -508,7 +508,8 @@ const renderImageTool: ToolDefinition = {
       return {
         content: [
           // { type: "image" as const, data: buf.toString("base64"), mimeType },
-          { type: "text" as const, text: `MEDIA:${filePath}` },
+          // { type: "text" as const, text: `MEDIA:${filePath}` },
+          { type: "text" as const, text: `MEDIA:` + params.image_url },
         ],
       };
     } catch (err) {

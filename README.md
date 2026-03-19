@@ -24,7 +24,14 @@ openclaw plugins update @whateverai/cloudphone
 
 ### 2. Configure the plugin
 
+You can configure the plugin in either of the following ways.
+
+#### Option A: Configuration file (openclaw.json)
+
 Add the following configuration to `openclaw.json`:
+
+- **baseUrl**: Use the default value; keep it as `https://whateverai.ai/ai` and you do not need to change it.
+- **apikey**: Obtain your API Key by logging in or signing up at [https://whateverai.ai](https://whateverai.ai), then add it in your account/settings and paste it into the `apikey` field below.
 
 ```json
 {
@@ -41,6 +48,20 @@ Add the following configuration to `openclaw.json`:
   }
 }
 ```
+
+#### Option B: OpenClaw Console UI
+
+You can also configure the CloudPhone plugin in the OpenClaw console UI:
+
+1. Open the OpenClaw console in your browser.
+2. Go to the Plugins section, find **CloudPhone** and enable it.
+3. Set **baseUrl** (keep the default `https://whateverai.ai/ai`) and **apikey** (from [https://whateverai.ai](https://whateverai.ai) after login or sign-up, in your account/settings).
+
+Screenshots:
+
+![OpenClaw Console — Plugins](assets/0.jpg)
+
+![OpenClaw Console — CloudPhone config](assets/1.jpg)
 
 ### 3. Restart the Gateway
 
@@ -108,7 +129,7 @@ If you need those capabilities, extend the plugin itself instead of changing onl
 | `apikey` | string | Yes | - | Authorization credential (ApiKey) |
 | `timeout` | number | No | `5000` | Request timeout in milliseconds |
 
-> You can obtain `apikey` from the CloudPhone management console.
+> Obtain your API Key by logging in or signing up at [https://whateverai.ai](https://whateverai.ai), then find it in your account/settings.
 
 ## Tool Overview
 
@@ -272,7 +293,7 @@ Starting from `v1.0.5`, the package ships with the `basic-skill` skill. It teach
 
 **Q: How do I get an `apikey`?**
 
-Create or view it from the API key page in the CloudPhone management console.
+Log in or sign up at [https://whateverai.ai](https://whateverai.ai) and get your API Key from your account/settings.
 
 **Q: `cloudphone_snapshot` returned a URL, but I cannot see the image in chat.**
 

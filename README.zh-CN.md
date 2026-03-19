@@ -24,7 +24,14 @@ openclaw plugins update @whateverai/cloudphone
 
 ### 2. 配置插件
 
+可通过以下两种方式之一配置插件。
+
+#### 方式一：配置文件（openclaw.json）
+
 在 `openclaw.json` 中添加以下配置：
+
+- **baseUrl**：使用默认值即可，保持为 `https://whateverai.ai/ai` 不需修改。
+- **apikey**：在 [https://whateverai.ai](https://whateverai.ai) 登录或注册后，在账户/设置中获取 API Key，填入下方 `apikey` 字段。
 
 ```json
 {
@@ -41,6 +48,20 @@ openclaw plugins update @whateverai/cloudphone
   }
 }
 ```
+
+#### 方式二：OpenClaw 控制台 UI
+
+也可以在 OpenClaw 控制台页面上配置 CloudPhone 插件：
+
+1. 在浏览器中打开 OpenClaw 控制台。
+2. 进入「插件」相关页面，找到 **CloudPhone** 并启用。
+3. 填写 **baseUrl**（保持默认 `https://whateverai.ai/ai` 即可）和 **apikey**（在 [https://whateverai.ai](https://whateverai.ai) 登录或注册后，于账户/设置中获取）。
+
+参考截图：
+
+![OpenClaw 控制台 — 插件](assets/0.jpg)
+
+![OpenClaw 控制台 — CloudPhone 配置](assets/1.jpg)
 
 ### 3. 重启 Gateway
 
@@ -108,7 +129,7 @@ skills/basic-skill/
 | `apikey` | string | 是 | — | Authorization 鉴权凭证（ApiKey） |
 | `timeout` | number | 否 | `5000` | 请求超时时间（毫秒） |
 
-> `apikey` 可在云手机管理后台获取。
+> `apikey` 请在 [https://whateverai.ai](https://whateverai.ai) 登录或注册后，在账户/设置中获取。
 
 ## 工具一览
 
@@ -272,7 +293,7 @@ image_url : string - HTTPS 图片地址（必填）
 
 **Q: 如何获取 `apikey`？**
 
-请在云手机管理后台的 API 密钥页面创建或查看。
+请在 [https://whateverai.ai](https://whateverai.ai) 登录或注册后，在账户/设置中获取 API Key。
 
 **Q: `cloudphone_snapshot` 返回了 URL，但对话中看不到图片？**
 
