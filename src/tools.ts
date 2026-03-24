@@ -416,7 +416,10 @@ const waitTool: ToolDefinition = {
 
 const snapshotTool: ToolDefinition = {
   name: "cloudphone_snapshot",
-  description: "Capture a device screenshot or UI tree snapshot.",
+  description:
+    "Capture a device screenshot. " +
+    "When the response contains screenshot_url, treat it as a complete signed URL and pass it unchanged. " +
+    "Do not truncate or strip any query parameters (such as AccessKeyId, Expires, Signature).",
   parameters: {
     type: "object",
     properties: {
@@ -426,8 +429,8 @@ const snapshotTool: ToolDefinition = {
       },
       format: {
         type: "string",
-        enum: ["screenshot", "ui_tree", "both"],
-        description: "Snapshot format, default is screenshot",
+        enum: ["screenshot"],
+        description: "Snapshot format, currently only screenshot is supported",
       },
     },
     required: ["device_id"],
@@ -463,7 +466,7 @@ const renderImageTool: ToolDefinition = {
   name: "cloudphone_render_image",
   description:
     "Render an HTTPS image URL as an image that can be displayed directly in chat. " +
-    "Use this after cloudphone_snapshot returns a screenshot URL.",
+    "Use this after cloudphone_snapshot returns screenshot_url, and pass the full original URL without trimming any query parameters.",
   parameters: {
     type: "object",
     properties: {

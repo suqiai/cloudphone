@@ -161,7 +161,7 @@ skills/basic-skill/
 | 工具 | 说明 |
 |------|------|
 | `cloudphone_wait` | 等待条件满足，例如元素出现、消失或页面稳定 |
-| `cloudphone_snapshot` | 获取设备截图或 UI 树快照 |
+| `cloudphone_snapshot` | 获取设备截图 |
 | `cloudphone_render_image` | 将截图 URL 渲染为对话中可直接展示的图片 |
 
 ## 使用示例
@@ -266,7 +266,7 @@ selector  : string  - 元素选择器（在元素出现/消失条件下使用）
 
 ```text
 device_id : string - 设备 ID（必填）
-format    : string - 快照格式："screenshot" | "ui_tree" | "both"，默认 screenshot
+format    : string - 快照格式："screenshot"（当前仅支持 screenshot）
 ```
 
 ### `cloudphone_render_image`

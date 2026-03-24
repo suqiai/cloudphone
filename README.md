@@ -161,7 +161,7 @@ After the plugin is installed, the agent automatically gets the following capabi
 | Tool | Description |
 |------|------|
 | `cloudphone_wait` | Wait for a condition such as element appear/disappear or page stability |
-| `cloudphone_snapshot` | Capture a screenshot or UI tree snapshot from the device |
+| `cloudphone_snapshot` | Capture a device screenshot |
 | `cloudphone_render_image` | Render a screenshot URL as an image directly in chat |
 
 ## Usage Examples
@@ -266,7 +266,7 @@ selector  : string  - Element selector used with appear/disappear conditions
 
 ```text
 device_id : string - Device ID (required)
-format    : string - Snapshot format: "screenshot" | "ui_tree" | "both", default screenshot
+format    : string - Snapshot format: "screenshot" (currently only screenshot is supported)
 ```
 
 ### `cloudphone_render_image`

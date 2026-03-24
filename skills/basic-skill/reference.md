@@ -131,12 +131,12 @@ The source of truth for parameters and descriptions is `src/tools.ts`.
 
 ### `cloudphone_snapshot`
 
-- Purpose: capture a device screenshot or UI tree snapshot
+- Purpose: capture a device screenshot
 - Required parameters:
 - `device_id`: `string`, device ID
 - Optional parameters:
-- `format`: `string`, allowed values: `screenshot`, `ui_tree`, `both`, default `screenshot`
-- Returns: snapshot result as JSON text, usually including a screenshot URL, a UI tree, or both
+- `format`: `string`, allowed value: `screenshot`, default `screenshot`
+- Returns: snapshot result as JSON text, including `screenshot_url`
 - Typical use: observe and verify the UI before and after any interaction
 
 ### `cloudphone_render_image`
