@@ -1,7 +1,7 @@
 {
   "id": "cloudphone",
   "name": "CloudPhone Plugin",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "OpenClaw CloudPhone plugin that exposes CloudPhone OpenAPI capabilities for user info, device management, and UI automation as agent tools.",
   "configSchema": {
     "type": "object",
@@ -10,7 +10,7 @@
       "baseUrl": {
         "type": "string",
         "description": "CloudPhone API base URL (without /openapi/v1)",
-        "default": "https://whateverai.ai/ai"
+        "default": "https://ai.suqi.tech/ai"
       },
       "apikey": {
         "type": "string",
@@ -20,13 +20,33 @@
         "type": "number",
         "description": "Request timeout in milliseconds",
         "default": 5000
+      },
+      "autoglmBaseUrl": {
+        "type": "string",
+        "description": "AutoGLM API base URL for cloudphone_plan_action (OpenAI-compatible endpoint, e.g. 'https://open.bigmodel.cn/api/paas/v4')"
+      },
+      "autoglmApiKey": {
+        "type": "string",
+        "description": "AutoGLM API key for cloudphone_plan_action"
+      },
+      "autoglmModel": {
+        "type": "string",
+        "description": "AutoGLM model name for cloudphone_plan_action (e.g. 'autoglm-phone')"
+      },
+      "autoglmMaxTokens": {
+        "type": "number",
+        "description": "Max tokens for AutoGLM model response (default 3000)"
+      },
+      "autoglmLang": {
+        "type": "string",
+        "description": "Language for AutoGLM system prompt: 'cn' (default) or 'en'"
       }
     }
   },
   "uiHints": {
     "baseUrl": {
       "label": "API Base URL",
-      "placeholder": "https://whateverai.ai/ai (without /openapi/v1)"
+      "placeholder": "https://ai.suqi.tech/ai (without /openapi/v1)"
     },
     "apikey": {
       "label": "Authorization / ApiKey",
@@ -35,6 +55,27 @@
     },
     "timeout": {
       "label": "Request Timeout (ms)"
+    },
+    "autoglmBaseUrl": {
+      "label": "AutoGLM API Base URL",
+      "placeholder": "e.g. https://open.bigmodel.cn/api/paas/v4"
+    },
+    "autoglmApiKey": {
+      "label": "AutoGLM API Key",
+      "placeholder": "AutoGLM provider API key",
+      "sensitive": true
+    },
+    "autoglmModel": {
+      "label": "AutoGLM Model",
+      "placeholder": "e.g. autoglm-phone"
+    },
+    "autoglmMaxTokens": {
+      "label": "AutoGLM Max Tokens",
+      "placeholder": "default 3000"
+    },
+    "autoglmLang": {
+      "label": "AutoGLM Language (cn / en)",
+      "placeholder": "cn"
     }
   },
   "skills": [

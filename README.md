@@ -301,7 +301,13 @@ The agent should call `cloudphone_render_image` automatically to turn that URL i
 
 ## Changelog
 
-Current version: **v1.0.8**
+Current version: **v1.1.0**
+
+### v1.1.0
+
+- Enhanced screenshot handling in `cloudphone_render_image` for improved compatibility and display reliability across hosts
+- Added the `cloudphone-snapshot-url` skill and aligned `basic-skill` guides/reference for screenshot URL workflows
+- Synced screenshot-related tool docs and skill guidance in both English and Chinese content
 
 ### v1.0.8
 

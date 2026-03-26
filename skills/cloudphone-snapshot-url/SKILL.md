@@ -1,6 +1,6 @@
 ---
 name: cloudphone-snapshot-url
-description: Cloud phone screenshot workflow with pre-signed S3 URLs (X-Amz-* query params). Use when capturing screenshots or sharing image links to users, WeChat Work, or any channel. Enforces verbatim cloudphone_snapshot screenshot_url and optional cloudphone_render_image; never truncate the URL before the query string.
+description: Pre-signed CloudPhone screenshot URLs (X-Amz-* etc. in query string). Use whenever screenshot_url is shown to users, IM, WeChat Work, or email—from cloudphone_snapshot or from cloudphone_analyze_screen. Enforces verbatim full URL for cloudphone_render_image; never strip ? or parameters.
 metadata:
   openclaw:
     requires:
@@ -12,7 +12,7 @@ metadata:
 
 Use this skill whenever you need a **screenshot** from a cloud phone **or** you must give the user a **link** to that image (including enterprise WeChat / 企业微信, IM, email, or chat).
 
-The `screenshot_url` returned by `cloudphone_snapshot` is a **pre-signed URL**. The signature lives in the **query string** (e.g. `X-Amz-Algorithm`, `X-Amz-Credential`, `X-Amz-Date`, `X-Amz-Expires`, `X-Amz-SignedHeaders`, `X-Amz-Signature`). If you drop anything after `?`, the link **will not work**.
+The **`screenshot_url`** field is **pre-signed** whether it comes from **`cloudphone_snapshot`** or from **`cloudphone_analyze_screen`** (the latter includes the same style of URL in its JSON). The signature lives in the **query string** (e.g. `X-Amz-Algorithm`, `X-Amz-Credential`, `X-Amz-Date`, `X-Amz-Expires`, `X-Amz-SignedHeaders`, `X-Amz-Signature`). If you drop anything after `?`, the link **will not work**.
 
 ## When to apply
 
@@ -21,9 +21,11 @@ The `screenshot_url` returned by `cloudphone_snapshot` is a **pre-signed URL**. 
 
 ## Required steps
 
-1. Call **`cloudphone_snapshot`** with the correct `device_id` (and `format: "screenshot"` if needed).
+1. Obtain a current **`screenshot_url`**:
+   - Call **`cloudphone_snapshot`** with the correct `device_id` when you only need the URL (or image) without VLM; or
+   - Read **`screenshot_url`** from the JSON returned by **`cloudphone_analyze_screen`** if you already ran it for automation and now need to share or render that same frame.
 
-2. Obtain **`screenshot_url`** from the tool result:
+2. From the tool result, obtain **`screenshot_url`**:
    - If the tool output includes a **CRITICAL** notice and a **fenced code block** with one long `https://...` line, treat that line as the canonical URL—copy it **in full**, single line, no edits.
    - Otherwise read **`screenshot_url`** from the JSON text in the result. Copy from **`https`** through the **last character** of the URL (the string must include `?` and all parameters).
 

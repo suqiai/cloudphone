@@ -301,7 +301,13 @@ Agent 应该会自动调用 `cloudphone_render_image` 将该 URL 转成可展示
 
 ## 更新日志
 
-当前版本：**v1.0.8**
+当前版本：**v1.1.0**
+
+### v1.1.0
+
+- 增强 `cloudphone_render_image` 的截图渲染处理，提升不同宿主中的兼容性与展示稳定性
+- 新增 `cloudphone-snapshot-url` skill，并同步更新 `basic-skill` 及参数速查文档的截图 URL 使用指引
+- 同步修订中英文文档中的截图相关工具说明与 skill 指南
 
 ### v1.0.8
 

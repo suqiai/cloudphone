@@ -16,12 +16,15 @@ interface PluginApi {
       entries?: Record<string, { config?: CloudphonePluginConfig }>;
     };
   };
-  registerTool: (tool: {
-    name: string;
-    description: string;
-    parameters: unknown;
-    execute: (id: string, params: Record<string, unknown>) => Promise<McpToolResult>;
-  }) => void;
+  registerTool: (
+    tool: {
+      name: string;
+      description: string;
+      parameters: unknown;
+      execute: (id: string, params: Record<string, unknown>) => Promise<McpToolResult>;
+    },
+    options?: { optional?: boolean }
+  ) => void;
 }
 
 /**
@@ -64,6 +67,26 @@ const plugin = {
         type: "number",
         description: "Request timeout in milliseconds",
       },
+      autoglmBaseUrl: {
+        type: "string",
+        description: "AutoGLM API base URL for cloudphone_plan_action (OpenAI-compatible, e.g. 'https://open.bigmodel.cn/api/paas/v4')",
+      },
+      autoglmApiKey: {
+        type: "string",
+        description: "AutoGLM API key for cloudphone_plan_action",
+      },
+      autoglmModel: {
+        type: "string",
+        description: "AutoGLM model name for cloudphone_plan_action (e.g. 'autoglm-phone')",
+      },
+      autoglmMaxTokens: {
+        type: "number",
+        description: "Max tokens for AutoGLM model response (default 3000)",
+      },
+      autoglmLang: {
+        type: "string",
+        description: "Language for AutoGLM system prompt: 'cn' (default) or 'en'",
+      },
     },
   },
 
@@ -75,61 +98,70 @@ const plugin = {
         baseUrl: config.baseUrl ?? "(not configured)",
         timeout: config.timeout,
         hasApikey: !!config.apikey,
+        autoglmBaseUrl: config.autoglmBaseUrl ?? "(not configured)",
+        hasAutoglmApiKey: !!config.autoglmApiKey,
+        autoglmModel: config.autoglmModel ?? "(not configured)",
+        autoglmMaxTokens: config.autoglmMaxTokens,
+        autoglmLang: config.autoglmLang ?? "cn",
       })}`
     );
     setConfig(config);
+
     console.log(
       `[cloudphone] plugin loaded, version=${version}, baseUrl=${config.baseUrl ?? "(not configured, using default)"}`
     );
 
     for (const tool of tools) {
-      api.registerTool({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-        execute: async (id, params) => {
-          console.log(
-            `[cloudphone] tool ${tool.name} started, id=${id}, params=${JSON.stringify(params)}`
-          );
-          try {
-            const result = await tool.execute(id, params);
+      api.registerTool(
+        {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+          execute: async (id, params) => {
             console.log(
-              `[cloudphone] tool ${tool.name} result: ${summarizeToolResult(result)}`
+              `[cloudphone] tool ${tool.name} started, id=${id}, params=${JSON.stringify(params)}`
             );
-            if (
-              result &&
-              Array.isArray(result.content) &&
-              result.content.length > 0
-            ) {
-              return result;
+            try {
+              const result = await tool.execute(id, params);
+              console.log(
+                `[cloudphone] tool ${tool.name} result: ${summarizeToolResult(result)}`
+              );
+              if (
+                result &&
+                Array.isArray(result.content) &&
+                result.content.length > 0
+              ) {
+                return result;
+              }
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: result
+                      ? JSON.stringify(result)
+                      : `[cloudphone] tool ${tool.name} did not return valid content`,
+                  },
+                ],
+              };
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : String(err);
+              console.error(
+                `[cloudphone] tool ${tool.name} failed: ${message}`
+              );
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: JSON.stringify({ ok: false, error: message }),
+                  },
+                ],
+              };
             }
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: result
-                    ? JSON.stringify(result)
-                    : `[cloudphone] tool ${tool.name} did not return valid content`,
-                },
-              ],
-            };
-          } catch (err) {
-            const message =
-              err instanceof Error ? err.message : String(err);
-            console.error(
-              `[cloudphone] tool ${tool.name} failed: ${message}`
-            );
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({ ok: false, error: message }),
-                },
-              ],
-            };
-          }
+          },
         },
-      });
+        tool.optional ? { optional: true } : undefined
+      );
       console.log(`[cloudphone] registered tool: ${tool.name}`);
     }
   },
