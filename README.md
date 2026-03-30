@@ -2,11 +2,9 @@
 
 [Chinese README](./README.zh-CN.md)
 
-OpenClaw CloudPhone is a plugin that gives AI agents device management and UI automation capabilities for cloud phones.
+OpenClaw CloudPhone is a plugin that gives AI agents cloud phone automation capabilities through natural language.
 
-With natural language instructions, an agent can list devices, power them on or off, capture screenshots, tap, swipe, type text, and perform other UI actions without writing manual scripts.
-
-Starting from `v2026.3.27`, the package ships with built-in skills (including `basic-skill`) that help agents combine these tools in a more reliable way.
+With a single instruction, an agent can submit any cloud phone task to the backend AI Agent, which handles the full execution loop — screen observation, LLM planning, and UI actions — and streams the result back in real time.
 
 ## Quick Start
 
@@ -24,15 +22,13 @@ openclaw plugins update @whateverai/cloudphone
 
 ### 2. Configure the plugin
 
-For most setups, you only need to set **`apikey`** in `plugins.entries.cloudphone.config`. The plugin applies built-in defaults for other optional settings. Advanced users can still add optional keys such as `baseUrl` or `timeout` when self-hosting or tuning behavior; see `openclaw.plugin.json` in this package for the full schema.
-
-You can configure the plugin in either of the following ways.
+Set **`apikey`** in `plugins.entries.cloudphone.config`. The plugin uses built-in defaults for other optional settings.
 
 #### Option A: Configuration file (openclaw.json)
 
 Add the following configuration to `openclaw.json`:
 
-- **apikey**: Obtain your API Key by logging in or signing up at [https://whateverai.ai](https://whateverai.ai), then add it in your account/settings and paste it into the `apikey` field below.
+- **apikey**: Obtain your API Key by logging in or signing up at [https://whateverai.ai](https://whateverai.ai), then add it in your account/settings.
 
 ```json
 {
@@ -51,17 +47,9 @@ Add the following configuration to `openclaw.json`:
 
 #### Option B: OpenClaw Console UI
 
-You can also configure the CloudPhone plugin in the OpenClaw console UI:
-
 1. Open the OpenClaw console in your browser.
 2. Go to the Plugins section, find **CloudPhone** and enable it.
-3. Set **apikey** (from [https://whateverai.ai](https://whateverai.ai) after login or sign-up, in your account/settings).
-
-Screenshots:
-
-![OpenClaw Console — Plugins](https://github.com/whateverai-ai/cloudphone/blob/main/assets/0.jpg)
-
-![OpenClaw Console — CloudPhone config](https://github.com/whateverai-ai/cloudphone/blob/main/assets/1.jpg)
+3. Set **apikey** (from [https://whateverai.ai](https://whateverai.ai) after login or sign-up).
 
 ### 3. Restart the Gateway
 
@@ -69,57 +57,15 @@ Screenshots:
 openclaw gateway restart
 ```
 
-Once the plugin is loaded successfully, the agent can use all CloudPhone tools. If the plugin is enabled correctly, the bundled `basic-skill` skill will also become available.
+## How It Works
 
-## How the Plugin and Skill Work Together
+This plugin exposes the CloudPhone backend AI Agent as two high-level tools:
 
-This repository is first and foremost an **OpenClaw plugin**. Its job is to expose the CloudPhone OpenAPI as tools that an agent can call.
+1. **`cloudphone_execute`** — Submit a natural language instruction to the backend. The backend handles LLM interpretation, cloud phone UI automation (observe → plan → act loop), and dispatches all actions automatically. Returns a `task_id` immediately.
 
-Starting from `v2026.3.27`, the package includes **OpenClaw skills**:
+2. **`cloudphone_task_result`** — Subscribe to the SSE stream for a task. Streams the agent's thinking process in real time and returns the final task result when execution completes.
 
-- Plugin: defines **what the agent can do** by providing `cloudphone_*` tools
-- Skill: defines **how the agent should do it reliably** by teaching call order, recovery steps, and safer workflows
-
-Together they form a complete automation loop:
-
-- The plugin provides the low-level capabilities such as device management, UI interaction, and screenshot capture
-- The skill helps the agent chain those capabilities into a stable multi-step workflow
-
-## Built-in Skill
-
-The package includes the `basic-skill` skill under:
-
-```text
-skills/basic-skill/
-```
-
-It contains:
-
-- `SKILL.md`: the main guide that defines scenarios, standard workflows, recovery strategies, and capability boundaries
-- `reference.md`: a quick reference for the 14 available tools and their parameters
-
-The skill does not add new API capabilities and does not require an extra install step. It only helps the agent use the existing tools more effectively.
-
-### What the Skill Solves
-
-`basic-skill` mainly improves the following areas:
-
-- Installation and troubleshooting: checking `openclaw.json` and `apikey`
-- Standard workflow: select device -> confirm online -> observe -> act -> verify
-- UI automation stability: using short loops such as observe -> act -> verify -> observe again
-- Recovery strategy: prefer `BACK`, `HOME`, and fresh screenshots; restart the device only when needed
-
-### Skill Boundaries
-
-The current skill is built on top of the existing plugin toolset, so it does not automatically provide these higher-level capabilities:
-
-- OCR
-- Find UI controls by text
-- Click controls directly by selector
-- Launch an app by package name
-- Complex macro recording and playback
-
-If you need those capabilities, extend the plugin itself instead of changing only the skill.
+The agent no longer needs to directly control UI coordinates, manage screenshots, or call individual tap/swipe/input tools. The backend AI Agent handles the full automation loop.
 
 ## Configuration
 
@@ -129,11 +75,11 @@ If you need those capabilities, extend the plugin itself instead of changing onl
 
 > Obtain your API Key by logging in or signing up at [https://whateverai.ai](https://whateverai.ai), then find it in your account/settings.
 
-Optional fields such as `baseUrl` and `timeout` are documented in `openclaw.plugin.json` and use built-in defaults when omitted; set them only for custom deployments or advanced tuning.
+Optional fields such as `baseUrl` and `timeout` are documented in `openclaw.plugin.json` and use built-in defaults when omitted.
 
 ## Tool Overview
 
-After the plugin is installed, the agent automatically gets the following capabilities.
+After the plugin is installed, the agent automatically gets the following tools.
 
 ### User and device management
 
@@ -142,187 +88,89 @@ After the plugin is installed, the agent automatically gets the following capabi
 | `cloudphone_get_user_profile` | Get the current user's basic information |
 | `cloudphone_list_devices` | List cloud phone devices with pagination, keyword search, and status filters |
 | `cloudphone_get_device_info` | Get detailed information for a specific device |
-| `cloudphone_device_power` | Control device power: start, stop, or restart |
-| `cloudphone_get_adb_connection` | Get ADB/SSH connection information for a device |
 
-### UI interaction
+### AI Agent task execution
 
 | Tool | Description |
 |------|------|
-| `cloudphone_tap` | Tap a specific screen coordinate |
-| `cloudphone_long_press` | Long press a coordinate with an optional duration |
-| `cloudphone_swipe` | Swipe from a start point to an end point |
-| `cloudphone_input_text` | Type text into the current input field |
-| `cloudphone_clear_text` | Clear the current input field |
-| `cloudphone_keyevent` | Send system keys such as back, home, enter, recent apps, or power |
-
-### State observation
-
-| Tool | Description |
-|------|------|
-| `cloudphone_wait` | Wait for a condition such as element appear/disappear or page stability |
-| `cloudphone_snapshot` | Capture a device screenshot |
-| `cloudphone_render_image` | Render a screenshot URL as an image directly in chat |
-
-## planActionTool (`cloudphone_plan_action`)
-
-`planActionTool` maps to `cloudphone_plan_action`. It lets the agent call an AutoGLM model to analyze the current screenshot and goal, then return a structured next-action plan for CloudPhone UI automation.
-
-Typical scenarios:
-- uncertain next step on a dynamic UI
-- deciding tap/swipe/input intent before execution
-- recovering when repeated direct actions fail
-
-### Prerequisites
-
-Configure these plugin fields before using `cloudphone_plan_action`:
-- required: `autoglmBaseUrl`, `autoglmApiKey`, `autoglmModel`
-- optional: `autoglmMaxTokens` (default `3000`), `autoglmLang` (default `cn`)
-
-Example (`plugins.entries.cloudphone.config`):
-
-```json
-{
-  "autoglmBaseUrl": "https://open.bigmodel.cn/api/paas/v4",
-  "autoglmApiKey": "your-api-key",
-  "autoglmModel": "autoglm-phone",
-  "autoglmMaxTokens": 3000,
-  "autoglmLang": "cn"
-}
-```
-
-### Parameters and minimal example
-
-Core input:
-- `device_id`: target cloud phone device ID
-- `goal`: natural language task goal
-
-Minimal example:
-
-```text
-device_id: "your-device-id"
-goal: "Open WeChat and enter the search page"
-```
-
-Expected output:
-- model reasoning summary for the current screen
-- a suggested next action that can be executed with `cloudphone_*` tools
-
-### Notes
-
-- If required `autoglm*` fields are missing, the tool returns a config error.
-- Recommended flow: `cloudphone_snapshot` -> `cloudphone_plan_action` -> execute with `cloudphone_tap`/`cloudphone_swipe`/`cloudphone_input_text` -> verify with new snapshot.
-- Keep each goal focused to one immediate UI objective for better planning quality.
+| `cloudphone_execute` | Submit a natural language instruction; returns task_id immediately |
+| `cloudphone_task_result` | Stream agent thinking and final result for a task via SSE |
 
 ## Usage Examples
 
 After installation and configuration, you can control cloud phones through natural language prompts.
 
-### View device list
-
-> Show me my cloud phone devices
-
-The agent will call `cloudphone_list_devices` and return the matching devices.
-
-### Power on and inspect the screen
-
-> Power on my cloud phone and show me the current screen
-
-The agent will typically call `cloudphone_device_power` -> `cloudphone_snapshot` -> `cloudphone_render_image`.
-
-### Run a UI automation flow
+### Run a UI automation task
 
 > Open WeChat on the cloud phone, search for the "OpenClaw" public account, and follow it
 
-The agent can combine the plugin tools with the bundled skill to plan the task and execute it using the safer pattern of observe first, then act, then verify.
+The agent will:
+1. Call `cloudphone_list_devices` to get the device ID
+2. Call `cloudphone_execute` with the instruction → receives `task_id`
+3. Call `cloudphone_task_result` with `task_id` → streams thinking and returns result
 
-### Get device debugging access
+### Check device status
 
-> Give me the ADB connection info for this cloud phone
+> Show me my cloud phone devices
 
-The agent will call `cloudphone_get_adb_connection` and return the host and port.
+The agent will call `cloudphone_list_devices` and return the device list.
+
+### Submit a task and wait for completion
+
+```text
+Agent: cloudphone_execute
+  instruction: "打开抖音，搜索美食视频并点赞第一条"
+  device_id: "abc123"
+→ returns: { ok: true, task_id: 42 }
+
+Agent: cloudphone_task_result
+  task_id: 42
+→ streams agent thinking, returns: { ok: true, status: "done", result: {...} }
+```
 
 ## Tool Parameters
+
+### `cloudphone_execute`
+
+```text
+instruction    : string  - Natural language task instruction (required)
+device_id      : string  - Device unique ID (recommended)
+user_device_id : number  - User device ID (compatibility, device_id takes priority)
+session_id     : string  - Optional session ID for streaming persistence
+lang           : string  - Language hint: "cn" (default) or "en"
+```
+
+### `cloudphone_task_result`
+
+```text
+task_id    : number - Task ID from cloudphone_execute (required)
+timeout_ms : number - Max wait time in milliseconds (default 300000)
+```
+
+**Response fields:**
+
+```text
+ok         : boolean - Whether the operation succeeded
+task_id    : number  - Echo of the input task_id
+status     : string  - "done" | "success" | "error" | "timeout"
+thinking   : string[] - Aggregated agent thinking steps
+result     : object  - Final task result from the backend
+message    : string  - Error message (when status is "error" or "timeout")
+```
 
 ### `cloudphone_list_devices`
 
 ```text
-keyword   : string  - Search keyword (device name or device ID)
-status    : string  - Status filter: "online" | "offline"
-page      : integer - Page number, default 1
-size      : integer - Items per page, default 20
+keyword : string  - Search keyword (device name or device ID)
+status  : string  - Status filter: "online" | "offline"
+page    : integer - Page number, default 1
+size    : integer - Items per page, default 20
 ```
 
-### `cloudphone_device_power`
+### `cloudphone_get_device_info`
 
 ```text
 user_device_id : number - User device ID (required)
-device_id      : string - Device ID (required)
-action         : string - Action: "start" | "stop" | "restart" (required)
-```
-
-### `cloudphone_tap`
-
-```text
-device_id : string  - Device ID (required)
-x         : integer - X coordinate in pixels (required)
-y         : integer - Y coordinate in pixels (required)
-```
-
-### `cloudphone_long_press`
-
-```text
-device_id : string  - Device ID (required)
-x         : integer - X coordinate in pixels (required)
-y         : integer - Y coordinate in pixels (required)
-duration  : integer - Press duration in milliseconds, default 1000
-```
-
-### `cloudphone_swipe`
-
-```text
-device_id : string  - Device ID (required)
-start_x   : integer - Start X coordinate (required)
-start_y   : integer - Start Y coordinate (required)
-end_x     : integer - End X coordinate (required)
-end_y     : integer - End Y coordinate (required)
-duration  : integer - Swipe duration in milliseconds, default 300
-```
-
-### `cloudphone_input_text`
-
-```text
-device_id : string - Device ID (required)
-text      : string - Text to input (required)
-```
-
-### `cloudphone_keyevent`
-
-```text
-device_id : string - Device ID (required)
-key_code  : string - Key code: "BACK" | "HOME" | "ENTER" | "RECENT" | "POWER" (required)
-```
-
-### `cloudphone_wait`
-
-```text
-device_id : string  - Device ID (required)
-condition : string  - Wait condition: "element_appear" | "element_disappear" | "page_stable" (required)
-timeout   : integer - Timeout in milliseconds, default 5000
-selector  : string  - Element selector used with appear/disappear conditions
-```
-
-### `cloudphone_snapshot`
-
-```text
-device_id : string - Device ID (required)
-format    : string - Snapshot format: "screenshot" (currently only screenshot is supported)
-```
-
-### `cloudphone_render_image`
-
-```text
-image_url : string - HTTPS image URL (required)
 ```
 
 ## FAQ
@@ -331,70 +179,51 @@ image_url : string - HTTPS image URL (required)
 
 Make sure `plugins.entries.cloudphone.enabled` is set to `true` in `openclaw.json`, then restart the Gateway.
 
-**Q: The tools work, but the agent is not very stable when operating a cloud phone UI.**
+**Q: `cloudphone_execute` returns ok but `cloudphone_task_result` times out.**
 
-Starting from `v2026.3.27`, the package ships with built-in skills such as `basic-skill`. They teach the agent to use the tools in a short loop: observe -> act -> verify -> observe again. Make sure you installed a recent version and restarted the Gateway so the latest skills were loaded.
+The default timeout is 5 minutes (300,000 ms). For long-running tasks you can increase `timeout_ms`. If the task consistently times out, check that the backend service is reachable and the device is online.
 
-**Q: A tool call fails with a request error or timeout.**
+**Q: A tool call fails with a request error or authorization failure.**
 
 - Check whether `apikey` is valid and that you restarted the Gateway after changing config
 - Check network connectivity and whether the CloudPhone service is reachable
-- If you use a custom deployment or endpoint, verify routing and availability on your side
+- `401` errors indicate an invalid or expired `apikey`
 
 **Q: How do I get an `apikey`?**
 
 Log in or sign up at [https://whateverai.ai](https://whateverai.ai) and get your API Key from your account/settings.
 
-**Q: `cloudphone_snapshot` returned a URL, but I cannot see the image in chat.**
+**Q: Does `cloudphone_execute` support concurrent tasks?**
 
-The agent should call `cloudphone_render_image` automatically to turn that URL into a displayable image. The current version returns an MCP `image` content block first and also keeps a fallback `MEDIA:<filePath>` text item for older hosts. If the image still does not appear, ask the agent to show the screenshot explicitly; if that still fails, the current host likely does not consume `type: "image"` content items yet.
+Yes. Each call returns an independent `task_id`. You can call `cloudphone_task_result` with each `task_id` separately.
 
 ## Changelog
 
-Current version: **v2026.3.27**
+Current version: **v2026.3.30**
+
+### v2026.3.30
+
+- Replaced 12 fine-grained UI automation tools (tap, swipe, snapshot, etc.) with 2 high-level backend-delegated tools
+- Added `cloudphone_execute`: submit natural language instructions to the backend AI Agent
+- Added `cloudphone_task_result`: stream agent thinking and final result via SSE
+- Removed AutoGLM direct integration (backend now handles the full observe → plan → act loop)
+- Simplified plugin config: removed all `autoglm*` fields, only `apikey`, `baseUrl`, `timeout` remain
+- Updated skills, README, and reference docs to reflect new architecture
 
 ### v2026.3.27
 
 - Summarized and aligned release notes based on target commit `1da1031`
 - Synced package/plugin/doc version references to `v2026.3.27`
-- Kept English and Chinese changelog/version labels consistent
-
-### v2026.3.26.1
-
-- Fixed leftover version wording in README sections that still referenced `v1.1.0`
-- Synced release-related version identifiers to `v2026.3.26.1`
-- Updated English and Chinese changelog/version labels consistently
-
-### v2026.3.26
-
-- Added verbose step-by-step logs for cloudphone_plan_action to improve debugging and failure tracing
-- Expanded planActionTool documentation with prerequisites, usage flow, and safety notes in both English and Chinese README
-- Synced built-in skills wording and release docs to align with the current v1.1.0+ behavior
 
 ### v1.1.0
 
-- Enhanced screenshot handling in `cloudphone_render_image` for improved compatibility and display reliability across hosts
-- Added the `cloudphone-snapshot-url` skill and aligned `basic-skill` guides/reference for screenshot URL workflows
-- Synced screenshot-related tool docs and skill guidance in both English and Chinese content
-
-### v1.0.8
-
-- Simplified plugin configuration documentation: typical users only need `apikey`; optional `baseUrl` and `timeout` remain in `openclaw.plugin.json` with built-in defaults
-- Updated `basic-skill` skill preconditions and troubleshooting to match the streamlined config guidance
-- Synced English and Chinese README and changelog wording
-
-### v1.0.7
-
-- Revised `cloudphone_snapshot` docs to clarify that it captures screenshots only
-- Updated the `format` parameter description to indicate only `screenshot` is supported
-- Synced related descriptions in English and Chinese README and tool reference docs
-- Aligned tool overview table rows for `cloudphone_snapshot` with the parameter documentation
+- Enhanced screenshot handling in `cloudphone_render_image` for improved compatibility
+- Added the `cloudphone-snapshot-url` skill
 
 ### v1.0.6
 
 - Added the built-in `basic-skill` skill distributed with the plugin
 - Added `reference.md` as a tool parameter quick reference
-- Expanded the documentation for plugin vs. skill responsibilities, standard workflows, and capability boundaries
 
 ## License
 

@@ -67,42 +67,16 @@ const plugin = {
         type: "number",
         description: "Request timeout in milliseconds",
       },
-      autoglmBaseUrl: {
-        type: "string",
-        description: "AutoGLM API base URL for cloudphone_plan_action (OpenAI-compatible, e.g. 'https://open.bigmodel.cn/api/paas/v4')",
-      },
-      autoglmApiKey: {
-        type: "string",
-        description: "AutoGLM API key for cloudphone_plan_action",
-      },
-      autoglmModel: {
-        type: "string",
-        description: "AutoGLM model name for cloudphone_plan_action (e.g. 'autoglm-phone')",
-      },
-      autoglmMaxTokens: {
-        type: "number",
-        description: "Max tokens for AutoGLM model response (default 3000)",
-      },
-      autoglmLang: {
-        type: "string",
-        description: "Language for AutoGLM system prompt: 'cn' (default) or 'en'",
-      },
     },
   },
 
   register(api: PluginApi) {
     const config = resolveConfig(api);
-    // Log only config presence and non-sensitive values. Never print secrets.
     console.log(
       `[cloudphone] register input: config=${JSON.stringify({
         baseUrl: config.baseUrl ?? "(not configured)",
         timeout: config.timeout,
         hasApikey: !!config.apikey,
-        autoglmBaseUrl: config.autoglmBaseUrl ?? "(not configured)",
-        hasAutoglmApiKey: !!config.autoglmApiKey,
-        autoglmModel: config.autoglmModel ?? "(not configured)",
-        autoglmMaxTokens: config.autoglmMaxTokens,
-        autoglmLang: config.autoglmLang ?? "cn",
       })}`
     );
     setConfig(config);
