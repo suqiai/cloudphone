@@ -208,7 +208,14 @@ user_device_id : number - 用户设备 ID（必填）
 
 ## 更新日志
 
-当前版本：**v2026.3.31**
+当前版本：**v2026.4.1**
+
+### v2026.4.1
+
+- 新增 `cloudphone_execute_and_wait`，自动串联任务提交与首次结果轮询
+- 明确任务提交、轮询与调用顺序的工具说明文档
+- 在 `.gitignore` 中新增 `docs/` 与 `openspec/`，便于项目管理
+- 同步 package/plugin/doc 的版本标识到 `v2026.4.1`
 
 ### v2026.3.31
 
