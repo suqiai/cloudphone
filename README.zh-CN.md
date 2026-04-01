@@ -59,11 +59,13 @@ openclaw gateway restart
 
 ## 工作原理
 
-本插件将云手机后端 AI Agent 能力封装为两个高层工具：
+本插件将云手机后端 AI Agent 能力封装为三个高层工具：
 
 1. **`cloudphone_execute`** — 将自然语言指令提交给后端。后端负责 LLM 语义解析、云手机 UI 自动化（观察 → 规划 → 操作 闭环）。立即返回 `task_id`。
 
-2. **`cloudphone_task_result`** — 订阅任务的 SSE 流。实时流式返回 Agent 的思考过程，执行完成后返回最终结果。
+2. **`cloudphone_execute_and_wait`** — 自动串联调用：先执行 `cloudphone_execute`，再自动触发一次 `cloudphone_task_result`，返回首个 10 秒轮询窗口结果。
+
+3. **`cloudphone_task_result`** — 订阅任务的 SSE 流；每次调用消费一个 10 秒窗口并返回该窗口内的 `thinking` 增量，直到终态。
 
 Agent 不再需要直接控制 UI 坐标、管理截图或逐一调用 tap/swipe/input 等工具。后端 AI Agent 处理完整的自动化闭环。
 
@@ -94,7 +96,8 @@ Agent 不再需要直接控制 UI 坐标、管理截图或逐一调用 tap/swipe
 | 工具 | 说明 |
 |------|------|
 | `cloudphone_execute` | 提交自然语言指令，立即返回 task_id |
-| `cloudphone_task_result` | 通过 SSE 流式获取 Agent 思考过程和最终结果 |
+| `cloudphone_execute_and_wait` | 自动串联 execute + 首次 task_result 轮询 |
+| `cloudphone_task_result` | 每次返回 10 秒窗口内的思考增量与当前状态 |
 
 ## 使用示例
 
@@ -106,8 +109,8 @@ Agent 不再需要直接控制 UI 坐标、管理截图或逐一调用 tap/swipe
 
 Agent 会：
 1. 调用 `cloudphone_list_devices` 获取设备 ID
-2. 调用 `cloudphone_execute` 提交指令 → 获得 `task_id`
-3. 调用 `cloudphone_task_result` 传入 `task_id` → 流式返回思考过程，输出最终结果
+2. 调用 `cloudphone_execute_and_wait` 提交指令并自动触发首次结果轮询
+3. 若状态为 `running`，继续每 10 秒调用一次 `cloudphone_task_result`，直到 `success`/`done`/`error`
 
 ### 查看设备列表
 
@@ -118,14 +121,14 @@ Agent 会调用 `cloudphone_list_devices` 返回设备列表。
 ### 提交任务并等待完成
 
 ```text
-Agent: cloudphone_execute
+Agent: cloudphone_execute_and_wait
   instruction: "打开抖音，搜索美食视频并点赞第一条"
   device_id: "abc123"
-→ 返回: { ok: true, task_id: 42 }
+→ 返回: { ok: false, task_result: { status: "running", thinking: [...] } }
 
 Agent: cloudphone_task_result
   task_id: 42
-→ 流式输出 Agent 思考，返回: { ok: true, status: "done", result: {...} }
+→ 10 秒窗口增量，直到终态: { ok: true, status: "done", result: {...} }
 ```
 
 ## 工具参数详解
@@ -144,7 +147,6 @@ lang           : string  - 语言提示："cn"（默认）或 "en"
 
 ```text
 task_id    : number - cloudphone_execute 返回的任务 ID（必填）
-timeout_ms : number - 最大等待时间（毫秒），默认 300000
 ```
 
 **返回字段：**
@@ -153,7 +155,7 @@ timeout_ms : number - 最大等待时间（毫秒），默认 300000
 ok         : boolean  - 操作是否成功
 task_id    : number   - 输入的任务 ID 回显
 status     : string   - "done" | "success" | "error" | "timeout"
-thinking   : string[] - 汇总的 Agent 思考步骤列表
+thinking   : string[] - 当前 10 秒窗口内新增的 Agent 思考步骤（增量）
 result     : object   - 后端返回的最终任务结果
 message    : string   - 错误信息（status 为 "error" 或 "timeout" 时）
 ```
@@ -179,9 +181,9 @@ user_device_id : number - 用户设备 ID（必填）
 
 确认 `plugins.entries.cloudphone.enabled` 设置为 `true`，然后重启 Gateway。
 
-**Q: `cloudphone_execute` 返回成功，但 `cloudphone_task_result` 超时？**
+**Q: `cloudphone_task_result` 为什么返回 `running`？**
 
-默认超时时间为 5 分钟（300,000 毫秒）。对于长时任务可以增大 `timeout_ms`。如果任务持续超时，请检查后端服务是否可达以及设备是否在线。
+这是正常行为，表示当前 10 秒轮询窗口未到终态。请继续每 10 秒调用一次 `cloudphone_task_result`，直到 `success`/`done`/`error`。
 
 **Q: 调用工具报鉴权失败或请求错误？**
 
@@ -195,7 +197,14 @@ user_device_id : number - 用户设备 ID（必填）
 
 **Q: `cloudphone_execute` 支持并发任务吗？**
 
-支持。每次调用返回独立的 `task_id`，可以分别调用 `cloudphone_task_result` 获取各自的结果。
+同一 agent 上下文不支持并发。插件会按 agent key（优先 `session_id`，其次 `device_id`，再其次 `user_device_id`，最后 default）强制串行执行。  
+如果上一个任务还未在 `cloudphone_task_result` 到达终态，你再次调用 `cloudphone_execute` 会返回 `code: "AGENT_BUSY"`，并携带 `blocking_task_id`。
+
+推荐调用顺序：
+
+1. `cloudphone_execute_and_wait`（自动触发首次轮询）
+2. `cloudphone_task_result`（若返回 `running`，继续轮询到终态：`success`/`done`/`error`）
+3. 再次 `cloudphone_execute`
 
 ## 更新日志
 

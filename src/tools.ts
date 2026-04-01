@@ -42,9 +42,65 @@ export interface ToolDefinition {
 
 let runtimeConfig: CloudphonePluginConfig = {};
 
+interface InFlightTaskRecord {
+  agentKey: string;
+  taskId: number | null;
+  reservedAt: number;
+}
+
+interface TaskPollingState {
+  taskId: number;
+  thinkingHistory: string[];
+  latestResult: unknown;
+  latestStatus: string;
+}
+
+const inFlightByAgentKey = new Map<string, InFlightTaskRecord>();
+const agentKeyByTaskId = new Map<number, string>();
+const taskPollingStateByTaskId = new Map<number, TaskPollingState>();
+
 /** Inject runtime config during plugin registration. */
 export function setConfig(config: CloudphonePluginConfig): void {
   runtimeConfig = config;
+}
+
+function getAgentKeyFromParams(params: Record<string, unknown>): string {
+  if (typeof params.session_id === "string" && params.session_id.trim()) {
+    return `session:${params.session_id.trim()}`;
+  }
+  if (typeof params.device_id === "string" && params.device_id.trim()) {
+    return `device:${params.device_id.trim()}`;
+  }
+  if (params.user_device_id !== undefined && params.user_device_id !== null) {
+    return `user_device:${String(params.user_device_id)}`;
+  }
+  return "default-agent";
+}
+
+function normalizeTaskId(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function releaseInFlightByTask(taskId: number): void {
+  const agentKey = agentKeyByTaskId.get(taskId);
+  if (!agentKey) {
+    taskPollingStateByTaskId.delete(taskId);
+    return;
+  }
+  const current = inFlightByAgentKey.get(agentKey);
+  if (current?.taskId === taskId) {
+    inFlightByAgentKey.delete(agentKey);
+  }
+  agentKeyByTaskId.delete(taskId);
+  taskPollingStateByTaskId.delete(taskId);
+}
+
+function isTerminalTaskStatus(status: string): boolean {
+  return status === "success" || status === "done" || status === "error" || status === "timeout";
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -272,7 +328,8 @@ const executeAgentTaskTool: ToolDefinition = {
   description:
     "Submit a natural language instruction to the cloud phone AI Agent for execution. " +
     "The backend parses the instruction, dispatches the task to the target device, and returns a taskId immediately. " +
-    "Call cloudphone_task_result with the returned taskId to stream the thinking process and final result. " +
+    "Prefer cloudphone_execute_and_wait to auto-chain the first cloudphone_task_result polling call. " +
+    "Otherwise call cloudphone_task_result with the returned taskId to stream progress and final result. " +
     "device_id (recommended) or user_device_id must be provided to identify the target device. " +
     "If neither is given, the backend will use the default device bound to the current user.\n\n" +
     "IMPORTANT constraints — strictly follow these rules:\n" +
@@ -308,6 +365,27 @@ const executeAgentTaskTool: ToolDefinition = {
     required: ["instruction"],
   },
   execute: async (_id, params) => {
+    const agentKey = getAgentKeyFromParams(params);
+    const inFlight = inFlightByAgentKey.get(agentKey);
+    if (inFlight) {
+      return toJsonText({
+        ok: false,
+        code: "AGENT_BUSY",
+        status: "running",
+        message:
+          "Agent already has an in-flight task. Call cloudphone_task_result and wait for terminal status before executing a new task.",
+        agent_id: agentKey,
+        blocking_task_id: inFlight.taskId,
+      });
+    }
+
+    const reservation: InFlightTaskRecord = {
+      agentKey,
+      taskId: null,
+      reservedAt: Date.now(),
+    };
+    inFlightByAgentKey.set(agentKey, reservation);
+
     const baseUrl = normalizeBaseUrl(runtimeConfig.baseUrl ?? "https://ai.suqi.tech/ai");
     const url = `${baseUrl}/openapi/v1/devices/execute`;
     const timeout = runtimeConfig.timeout ?? 30000;
@@ -353,6 +431,7 @@ const executeAgentTaskTool: ToolDefinition = {
       );
 
       if (!response.ok) {
+        inFlightByAgentKey.delete(agentKey);
         return toJsonText({
           ok: false,
           httpStatus: response.status,
@@ -363,20 +442,36 @@ const executeAgentTaskTool: ToolDefinition = {
       const resp = (await response.json()) as Record<string, unknown>;
 
       if (resp.status === "fail") {
+        inFlightByAgentKey.delete(agentKey);
         return toJsonText({
           ok: false,
           message: String(resp.message ?? "Task execution failed"),
         });
       }
 
+      const normalizedTaskId = normalizeTaskId(resp.taskId);
+      if (!normalizedTaskId) {
+        inFlightByAgentKey.delete(agentKey);
+        return toJsonText({
+          ok: false,
+          code: "INVALID_EXECUTE_RESPONSE",
+          message: "Task submitted but backend response did not include a valid taskId",
+        });
+      }
+
+      reservation.taskId = normalizedTaskId;
+      agentKeyByTaskId.set(normalizedTaskId, agentKey);
+
       return toJsonText({
         ok: true,
-        task_id: resp.taskId,
+        task_id: normalizedTaskId,
         session_id: resp.sessionId,
         status: resp.status,
         message: resp.message,
+        agent_id: agentKey,
       });
     } catch (err) {
+      inFlightByAgentKey.delete(agentKey);
       const elapsed = Date.now() - started;
       const message = err instanceof Error ? err.message : String(err);
       console.error(
@@ -450,29 +545,30 @@ async function consumeSseStream(
   url: string,
   headers: Record<string, string>,
   taskId: number,
-  attemptTimeoutMs: number,
-  priorThinking: string[]
+  attemptTimeoutMs: number
 ): Promise<{
-  thinking: string[];
+  thinkingDelta: string[];
   taskResult: unknown;
   finalStatus: string;
   errorMessage: string | undefined;
-  shouldRetry: boolean;
+  pollWindowElapsed: boolean;
 }> {
-  const thinkingLines: string[] = [...priorThinking];
+  const thinkingLines: string[] = [];
   let taskResult: unknown = null;
-  let finalStatus = "unknown";
+  let finalStatus = "running";
   let errorMessage: string | undefined;
-  let shouldRetry = false;
+  let pollWindowElapsed = false;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedByWindow = false;
   try {
     const controller =
       typeof AbortController !== "undefined" ? new AbortController() : undefined;
     if (controller) {
       timer = setTimeout(() => {
+        timedByWindow = true;
         console.warn(
-          `${LOG_PREFIX} cloudphone_task_result attempt timeout after ${attemptTimeoutMs}ms task_id=${taskId}`
+          `${LOG_PREFIX} cloudphone_task_result poll window elapsed after ${attemptTimeoutMs}ms task_id=${taskId}`
         );
         controller.abort();
       }, attemptTimeoutMs);
@@ -486,21 +582,21 @@ async function consumeSseStream(
 
     if (!response.ok) {
       return {
-        thinking: thinkingLines,
+        thinkingDelta: thinkingLines,
         taskResult,
         finalStatus: "error",
         errorMessage: `HTTP error: ${response.status} ${response.statusText}`,
-        shouldRetry: response.status >= 500,
+        pollWindowElapsed: false,
       };
     }
 
     if (!response.body) {
       return {
-        thinking: thinkingLines,
+        thinkingDelta: thinkingLines,
         taskResult,
         finalStatus: "error",
         errorMessage: "Response body is null",
-        shouldRetry: false,
+        pollWindowElapsed: false,
       };
     }
 
@@ -585,44 +681,48 @@ async function consumeSseStream(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const isNetworkOrTimeout =
-      message.includes("abort") ||
-      message.toLowerCase().includes("timeout") ||
-      message.toLowerCase().includes("network") ||
-      message.toLowerCase().includes("econnreset") ||
-      message.toLowerCase().includes("econnrefused");
+    const messageLower = message.toLowerCase();
+    const isNetworkError =
+      !timedByWindow &&
+      (message.includes("abort") ||
+        messageLower.includes("timeout") ||
+        messageLower.includes("network") ||
+        messageLower.includes("econnreset") ||
+        messageLower.includes("econnrefused"));
 
-    console.error(
-      `${LOG_PREFIX} cloudphone_task_result stream error task_id=${taskId}: ${message}`
-    );
-
-    if (isNetworkOrTimeout) {
-      finalStatus = "timeout";
-      errorMessage = `Stream interrupted: ${message}`;
-      shouldRetry = true;
+    if (timedByWindow) {
+      pollWindowElapsed = true;
+      finalStatus = "running";
     } else {
-      finalStatus = "error";
-      errorMessage = `Stream error: ${message}`;
+      console.error(
+        `${LOG_PREFIX} cloudphone_task_result stream error task_id=${taskId}: ${message}`
+      );
+
+      if (isNetworkError) {
+        finalStatus = "timeout";
+        errorMessage = `Stream interrupted: ${message}`;
+      } else {
+        finalStatus = "error";
+        errorMessage = `Stream error: ${message}`;
+      }
     }
   } finally {
     if (timer) clearTimeout(timer);
   }
 
-  return { thinking: thinkingLines, taskResult, finalStatus, errorMessage, shouldRetry };
+  return { thinkingDelta: thinkingLines, taskResult, finalStatus, errorMessage, pollWindowElapsed };
 }
 
 /**
- * Consume the SSE task result stream and aggregate thinking + final result.
- * Automatically retries up to 2 times on timeout or transient network errors.
+ * Consume one 10s SSE polling window and return delta updates.
  */
 const getTaskResultTool: ToolDefinition = {
   name: "cloudphone_task_result",
   description:
     "Stream the execution progress and final result of a cloud phone Agent task. " +
     "Call this after cloudphone_execute with the returned task_id. " +
-    "The tool subscribes to the backend SSE stream and returns aggregated agent thinking and the final task result. " +
-    "The stream ends when a 'done' or 'error' event is received, or when timeout_ms elapses. " +
-    "On transient network errors or timeouts, the tool automatically retries up to 2 times.",
+    "The tool subscribes to the backend SSE stream for a 10-second polling window and returns the thinking delta for that window. " +
+    "Keep calling this tool every ~10 seconds until status reaches terminal: success, done, or error.",
   parameters: {
     type: "object",
     properties: {
@@ -630,18 +730,19 @@ const getTaskResultTool: ToolDefinition = {
         type: "number",
         description: "Task ID returned by cloudphone_execute.",
       },
-      timeout_ms: {
-        type: "number",
-        description: "Maximum time to wait for the stream to complete in milliseconds. Default is 300000 (5 minutes).",
-      },
     },
     required: ["task_id"],
   },
   execute: async (_id, params) => {
     const taskId = Number(params.task_id);
-    const totalTimeoutMs = Number(params.timeout_ms ?? 300000);
+    const normalizedTaskId = normalizeTaskId(taskId);
+    if (!normalizedTaskId) {
+      return toJsonText({ ok: false, status: "error", message: "Invalid task_id" });
+    }
+
+    const pollWindowMs = 10000;
     const baseUrl = normalizeBaseUrl(runtimeConfig.baseUrl ?? "https://ai.suqi.tech/ai");
-    const url = `${baseUrl}/openapi/v1/devices/result/${taskId}`;
+    const url = `${baseUrl}/openapi/v1/devices/result/${normalizedTaskId}`;
 
     const headers: Record<string, string> = {
       Accept: "text/event-stream",
@@ -651,119 +752,122 @@ const getTaskResultTool: ToolDefinition = {
       headers.Authorization = runtimeConfig.apikey;
     }
 
-    const started = Date.now();
-    const maxAttempts = 3;
-    const retryDelayMs = 2000;
-
     console.log(
-      `${LOG_PREFIX} cloudphone_task_result start task_id=${taskId} timeout=${totalTimeoutMs}ms maxAttempts=${maxAttempts}`
+      `${LOG_PREFIX} cloudphone_task_result start task_id=${normalizedTaskId} poll_window=${pollWindowMs}ms`
     );
 
-    let accumulatedThinking: string[] = [];
-    let lastResult: {
-      thinking: string[];
-      taskResult: unknown;
-      finalStatus: string;
-      errorMessage: string | undefined;
-      shouldRetry: boolean;
-    } | undefined;
+    const pollingState =
+      taskPollingStateByTaskId.get(normalizedTaskId) ??
+      ({
+        taskId: normalizedTaskId,
+        thinkingHistory: [],
+        latestResult: null,
+        latestStatus: "running",
+      } as TaskPollingState);
+    taskPollingStateByTaskId.set(normalizedTaskId, pollingState);
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const elapsed = Date.now() - started;
-      const remaining = totalTimeoutMs - elapsed;
-      if (remaining <= 0) {
-        console.warn(
-          `${LOG_PREFIX} cloudphone_task_result total timeout reached before attempt ${attempt} task_id=${taskId}`
-        );
-        break;
-      }
-
-      if (attempt > 1) {
-        console.log(
-          `${LOG_PREFIX} cloudphone_task_result retry attempt=${attempt} task_id=${taskId} elapsed=${elapsed}ms`
-        );
-        await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
-      }
-
-      // Give each attempt a fair slice of the remaining time (at least 30s)
-      const attemptTimeout = Math.max(30000, Math.min(remaining, totalTimeoutMs));
-
-      lastResult = await consumeSseStream(
-        url,
-        headers,
-        taskId,
-        attemptTimeout,
-        accumulatedThinking
-      );
-
-      accumulatedThinking = lastResult.thinking;
-
-      const totalElapsed = Date.now() - started;
-      console.log(
-        `${LOG_PREFIX} cloudphone_task_result attempt=${attempt} status=${lastResult.finalStatus} elapsed=${totalElapsed}ms thinking_count=${lastResult.thinking.length}`
-      );
-
-      // Terminal states — no retry needed
-      if (
-        lastResult.finalStatus === "success" ||
-        lastResult.finalStatus === "done" ||
-        lastResult.finalStatus === "error"
-      ) {
-        break;
-      }
-
-      // Only retry on transient failures
-      if (!lastResult.shouldRetry) {
-        break;
-      }
-    }
-
-    if (!lastResult) {
-      return toJsonText({
-        ok: false,
-        task_id: taskId,
-        status: "timeout",
-        message: `Total timeout of ${totalTimeoutMs}ms elapsed before stream started`,
-        thinking: accumulatedThinking,
-        result: null,
-      });
-    }
-
-    const { finalStatus, errorMessage, taskResult } = lastResult;
-    const totalElapsed = Date.now() - started;
+    const { thinkingDelta, finalStatus, errorMessage, taskResult, pollWindowElapsed } =
+      await consumeSseStream(url, headers, normalizedTaskId, pollWindowMs);
 
     console.log(
-      `${LOG_PREFIX} cloudphone_task_result done task_id=${taskId} status=${finalStatus} total_elapsed=${totalElapsed}ms thinking_count=${accumulatedThinking.length}`
+      `${LOG_PREFIX} cloudphone_task_result done task_id=${normalizedTaskId} status=${finalStatus} delta_count=${thinkingDelta.length}`
     );
+
+    if (thinkingDelta.length > 0) {
+      pollingState.thinkingHistory.push(...thinkingDelta);
+    }
+    if (taskResult !== null && taskResult !== undefined) {
+      pollingState.latestResult = taskResult;
+    }
+    pollingState.latestStatus = finalStatus;
 
     if (finalStatus === "error") {
+      releaseInFlightByTask(normalizedTaskId);
       return toJsonText({
         ok: false,
-        task_id: taskId,
+        task_id: normalizedTaskId,
         status: "error",
         message: errorMessage ?? "Task failed with error",
-        thinking: accumulatedThinking,
-        result: taskResult,
+        thinking: thinkingDelta,
+        result: pollingState.latestResult,
       });
     }
 
     if (finalStatus === "timeout") {
       return toJsonText({
         ok: false,
-        task_id: taskId,
+        task_id: normalizedTaskId,
         status: "timeout",
-        message: `Stream timed out after ${totalElapsed}ms (${maxAttempts} attempts)`,
-        thinking: accumulatedThinking,
-        result: taskResult,
+        message: errorMessage ?? "Stream interrupted in current polling window",
+        thinking: thinkingDelta,
+        result: pollingState.latestResult,
       });
     }
 
+    if (!isTerminalTaskStatus(finalStatus)) {
+      return toJsonText({
+        ok: false,
+        code: "TASK_NOT_FINISHED",
+        task_id: normalizedTaskId,
+        status: "running",
+        message: pollWindowElapsed
+          ? "Polling window completed. Continue calling cloudphone_task_result every 10s until terminal status."
+          : "Task has not reached terminal status yet. Continue polling cloudphone_task_result.",
+        thinking: thinkingDelta,
+        result: pollingState.latestResult,
+      });
+    }
+
+    releaseInFlightByTask(normalizedTaskId);
+
     return toJsonText({
       ok: true,
-      task_id: taskId,
+      task_id: normalizedTaskId,
       status: finalStatus,
-      thinking: accumulatedThinking,
-      result: taskResult,
+      thinking: thinkingDelta,
+      result: pollingState.latestResult,
+    });
+  },
+};
+
+function parseJsonResult(result: McpToolResult): Record<string, unknown> {
+  const text = result.content[0]?.type === "text" ? result.content[0].text : "{}";
+  try {
+    return JSON.parse(text ?? "{}") as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+const executeAndPollTool: ToolDefinition = {
+  name: "cloudphone_execute_and_wait",
+  description:
+    "Submit a task with cloudphone_execute and automatically call cloudphone_task_result once. " +
+    "This tool returns the first 10-second polling window result so callers do not need to manually chain the first poll.",
+  parameters: executeAgentTaskTool.parameters,
+  execute: async (id, params) => {
+    const executeResult = parseJsonResult(await executeAgentTaskTool.execute(id, params));
+    if (executeResult.ok !== true) {
+      return toJsonText(executeResult);
+    }
+    const taskId = normalizeTaskId(executeResult.task_id);
+    if (!taskId) {
+      return toJsonText({
+        ok: false,
+        code: "INVALID_EXECUTE_RESPONSE",
+        message: "cloudphone_execute returned no valid task_id",
+      });
+    }
+    const firstPoll = parseJsonResult(
+      await getTaskResultTool.execute(`${id}:poll`, {
+        task_id: taskId,
+      })
+    );
+    return toJsonText({
+      ok: firstPoll.ok,
+      task_id: taskId,
+      execute: executeResult,
+      task_result: firstPoll,
     });
   },
 };
@@ -774,5 +878,6 @@ export const tools: ToolDefinition[] = [
   listDevicesTool,
   getDeviceInfoTool,
   executeAgentTaskTool,
+  executeAndPollTool,
   getTaskResultTool,
 ];
