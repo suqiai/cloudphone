@@ -35,6 +35,29 @@ function resolveConfig(api: PluginApi): CloudphonePluginConfig {
 }
 
 function summarizeToolResult(result: McpToolResult): string {
+  const sanitizeForLog = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map((item) => sanitizeForLog(item));
+    }
+    if (value && typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (k === "screenshot_url" && typeof v === "string") {
+          try {
+            const u = new URL(v);
+            out[k] = `${u.origin}${u.pathname}`;
+          } catch {
+            out[k] = "(invalid url)";
+          }
+          continue;
+        }
+        out[k] = sanitizeForLog(v);
+      }
+      return out;
+    }
+    return value;
+  };
+
   return JSON.stringify({
     content: result.content.map((item) =>
       item.type === "image"
@@ -43,7 +66,14 @@ function summarizeToolResult(result: McpToolResult): string {
             mimeType: item.mimeType,
             dataBytes: item.data.length,
           }
-        : item
+        : (() => {
+            try {
+              const parsed = JSON.parse(item.text);
+              return { ...item, text: JSON.stringify(sanitizeForLog(parsed)) };
+            } catch {
+              return item;
+            }
+          })()
     ),
   });
 }

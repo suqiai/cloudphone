@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setConfig, tools } from "./tools";
+import { setConfig, tools } from "./tools.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -214,4 +214,82 @@ test("cloudphone_execute_and_wait auto chains first poll", async () => {
   const taskResult = result.task_result as JsonRecord;
   assert.equal(taskResult.status, "running");
   assert.deepEqual(taskResult.thinking, ["step-1"]);
+});
+
+test("cloudphone_get_device_screenshot_url returns original URL and sanitized logs", async () => {
+  setConfig({ baseUrl: "https://whateverai.ai/ai", timeout: 1000 });
+  const screenshotTool = getTool("cloudphone_get_device_screenshot_url");
+  const screenshotUrl =
+    "https://cdn.example.com/snapshots/a.png?X-Amz-Signature=abc123&X-Amz-Expires=60";
+
+  let sentBody: JsonRecord = {};
+  globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    sentBody = JSON.parse(String(init?.body ?? "{}")) as JsonRecord;
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      async json() {
+        return {
+          code: 1,
+          data: {
+            screenshot_url: screenshotUrl,
+          },
+        };
+      },
+    } as unknown as Response;
+  }) as typeof fetch;
+
+  const logs: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+
+  try {
+    const result = parseToolText(
+      await screenshotTool.execute("shot-ok", {
+        device_id: "device-1",
+      })
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.device_id, "device-1");
+    assert.equal(result.screenshot_url, screenshotUrl);
+    assert.equal(sentBody.device_id, "device-1");
+    assert.equal(sentBody.type, "screenshot");
+
+    assert.equal(logs.some((line) => line.includes("X-Amz-Signature=abc123")), false);
+    assert.equal(logs.some((line) => line.includes("https://cdn.example.com/snapshots/a.png")), true);
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("cloudphone_get_device_screenshot_url returns machine-readable upstream error", async () => {
+  setConfig({ baseUrl: "https://whateverai.ai/ai", timeout: 1000 });
+  const screenshotTool = getTool("cloudphone_get_device_screenshot_url");
+
+  globalThis.fetch = (async () => {
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      async json() {
+        return {
+          code: 0,
+          message: "snapshot failed",
+        };
+      },
+    } as unknown as Response;
+  }) as typeof fetch;
+
+  const result = parseToolText(
+    await screenshotTool.execute("shot-fail", {
+      device_id: "device-2",
+    })
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "UPSTREAM_ERROR");
+  assert.equal(result.message, "snapshot failed");
 });

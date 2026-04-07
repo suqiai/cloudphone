@@ -90,6 +90,7 @@ After the plugin is installed, the agent automatically gets the following tools.
 | `cloudphone_get_user_profile` | Get the current user's basic information |
 | `cloudphone_list_devices` | List cloud phone devices with pagination, keyword search, and status filters |
 | `cloudphone_get_device_info` | Get detailed information for a specific device |
+| `cloudphone_get_device_screenshot_url` | Get the latest screenshot URL by `device_id` (default-enabled; user-trigger only) |
 
 ### AI Agent task execution
 
@@ -175,6 +176,17 @@ size    : integer - Items per page, default 20
 user_device_id : number - User device ID (required)
 ```
 
+### `cloudphone_get_device_screenshot_url`
+
+```text
+device_id : string - Device unique ID (required)
+```
+
+Notes:
+- This tool is available by default after plugin installation (no extra whitelist enablement required).
+- Call this tool only when the user explicitly requests a screenshot URL.
+- The returned `screenshot_url` is passed through as-is from upstream and should be treated as a sensitive temporary credential URL.
+
 ## FAQ
 
 **Q: The agent cannot find the CloudPhone tools after installation.**
@@ -208,7 +220,14 @@ Required call order:
 
 ## Changelog
 
-Current version: **v2026.4.2**
+Current version: **v2026.4.3**
+
+### v2026.4.3
+
+- Added `cloudphone_get_device_screenshot_url` to fetch the latest device screenshot URL (default-enabled; intended for explicit user requests only)
+- Redacted signed query parameters from `screenshot_url` in plugin logs and tool-result summaries while returning the full URL to the agent
+- Scoped `tsconfig.json` to `src/**/*.ts` and excluded `*.test.ts` from the build output
+- Synced package/plugin/doc version references to `v2026.4.3`
 
 ### v2026.4.2
 

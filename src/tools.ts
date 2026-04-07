@@ -316,6 +316,118 @@ const getDeviceInfoTool: ToolDefinition = {
   execute: async (_id, params) => apiRequest("POST", "/devices/info", params),
 };
 
+const getDeviceScreenshotUrlTool: ToolDefinition = {
+  name: "cloudphone_get_device_screenshot_url",
+  description:
+    "Get the latest screenshot URL for a specific cloud phone device by device_id. " +
+    "This tool is enabled by default. Invoke it ONLY when the user explicitly requests a screenshot URL. " +
+    "Do NOT call this tool autonomously for non-explicit requests.",
+  parameters: {
+    type: "object",
+    properties: {
+      device_id: {
+        type: "string",
+        description: "Device unique ID",
+      },
+    },
+    required: ["device_id"],
+  },
+  execute: async (_id, params) => {
+    const deviceId = String(params.device_id ?? "").trim();
+    if (!deviceId) {
+      return toJsonText({
+        ok: false,
+        code: "INVALID_PARAMS",
+        message: "device_id is required",
+      });
+    }
+
+    const baseUrl = normalizeBaseUrl(runtimeConfig.baseUrl ?? "https://whateverai.ai/ai");
+    const url = `${baseUrl}/openapi/v1/devices/snapshot`;
+    const timeout = runtimeConfig.timeout ?? 5000;
+    const payload = {
+      device_id: deviceId,
+      type: "screenshot",
+    };
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (runtimeConfig.apikey) {
+      headers.Authorization = runtimeConfig.apikey;
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : undefined;
+      if (controller) {
+        timer = setTimeout(() => controller.abort(), timeout);
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller?.signal,
+      });
+
+      if (!response.ok) {
+        return toJsonText({
+          ok: false,
+          code: "HTTP_ERROR",
+          http_status: response.status,
+          message: `HTTP error: ${response.status} ${response.statusText}`,
+        });
+      }
+
+      const body = (await response.json()) as Record<string, unknown>;
+      if (!isSuccessfulApiResponse(body)) {
+        return toJsonText({
+          ok: false,
+          code: "UPSTREAM_ERROR",
+          upstream_code: body.code ?? null,
+          message: getApiErrorMessage(body),
+          upstream: body,
+        });
+      }
+
+      const data =
+        body && typeof body.data === "object" && body.data !== null
+          ? (body.data as Record<string, unknown>)
+          : body;
+      const screenshotUrl = typeof data.screenshot_url === "string" ? data.screenshot_url : "";
+      if (!screenshotUrl) {
+        return toJsonText({
+          ok: false,
+          code: "INVALID_UPSTREAM_PAYLOAD",
+          message: "Upstream response missing screenshot_url",
+          upstream: data,
+        });
+      }
+
+      console.log(
+        `${LOG_PREFIX} screenshot_url ready device_id=${deviceId} safe_url=${safeUrlForLog(screenshotUrl)}`
+      );
+
+      return toJsonText({
+        ok: true,
+        device_id: deviceId,
+        screenshot_url: screenshotUrl,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return toJsonText({
+        ok: false,
+        code: "REQUEST_FAILED",
+        message: `Request failed: ${message}`,
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  },
+};
+
 // ─── Agent task execution ─────────────────────────────────────────────────
 
 /**
@@ -877,6 +989,7 @@ export const tools: ToolDefinition[] = [
   getUserProfileTool,
   listDevicesTool,
   getDeviceInfoTool,
+  getDeviceScreenshotUrlTool,
   executeAgentTaskTool,
   executeAndPollTool,
   getTaskResultTool,
