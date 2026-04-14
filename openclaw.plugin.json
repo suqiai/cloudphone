@@ -1,7 +1,7 @@
 {
   "id": "cloudphone",
   "name": "CloudPhone Plugin",
-  "version": "2026.4.3",
+  "version": "2026.4.4",
   "description": "OpenClaw CloudPhone plugin that exposes CloudPhone AI Agent capabilities as agent tools. Submit natural language instructions for cloud phone automation and stream task results via SSE.",
   "configSchema": {
     "type": "object",
@@ -20,6 +20,14 @@
         "type": "number",
         "description": "Request timeout in milliseconds",
         "default": 5000
+      },
+      "llmApiKey": {
+        "type": "string",
+        "description": "Default LLM provider API key for cloud phone automation"
+      },
+      "llmBaseUrl": {
+        "type": "string",
+        "description": "Default LLM provider base URL for cloud phone automation"
       }
     }
   },
@@ -35,6 +43,15 @@
     },
     "timeout": {
       "label": "Request Timeout (ms)"
+    },
+    "llmApiKey": {
+      "label": "LLM API Key",
+      "placeholder": "sk-xxx",
+      "sensitive": true
+    },
+    "llmBaseUrl": {
+      "label": "LLM Base URL",
+      "placeholder": "https://api.openai.com/v1"
     }
   },
   "skills": [

@@ -15,6 +15,8 @@ export interface CloudphonePluginConfig {
   baseUrl?: string;
   apikey?: string;
   timeout?: number;
+  llmApiKey?: string;
+  llmBaseUrl?: string;
 }
 
 /** MCP content items (text | image), following MCP + OpenClaw conventions. */
@@ -473,6 +475,14 @@ const executeAgentTaskTool: ToolDefinition = {
         enum: ["cn", "en"],
         description: "Language hint for the task instruction. Defaults to 'cn'.",
       },
+      api_key: {
+        type: "string",
+        description: "Optional LLM provider API key for the cloud phone automation agent. Overrides the plugin-level llmApiKey config when provided.",
+      },
+      base_url: {
+        type: "string",
+        description: "Optional LLM provider base URL for the cloud phone automation agent. Overrides the plugin-level llmBaseUrl config when provided.",
+      },
     },
     required: ["instruction"],
   },
@@ -509,6 +519,10 @@ const executeAgentTaskTool: ToolDefinition = {
     if (params.user_device_id !== undefined) body.user_device_id = params.user_device_id;
     if (params.session_id !== undefined) body.session_id = params.session_id;
     if (params.lang !== undefined) body.lang = params.lang;
+    const effectiveLlmApiKey = (params.api_key as string | undefined) ?? runtimeConfig.llmApiKey;
+    const effectiveLlmBaseUrl = (params.base_url as string | undefined) ?? runtimeConfig.llmBaseUrl;
+    if (effectiveLlmApiKey) body.api_key = effectiveLlmApiKey;
+    if (effectiveLlmBaseUrl) body.base_url = effectiveLlmBaseUrl;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
